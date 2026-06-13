@@ -16,7 +16,40 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 	struct Snapshot: Equatable {
 		var old: Lemma.ID?
 		var new: Lemma.ID?
+		var document: Lexicon.Document
 		var graph: Lexicon.Graph
+
+		init(
+			old: Lemma.ID? = nil,
+			new: Lemma.ID? = nil,
+			document: Lexicon.Document,
+			graph: Lexicon.Graph
+		) {
+			self.old = old
+			self.new = new
+			self.document = document
+			self.graph = graph
+		}
+
+		init(old: Lemma.ID? = nil, new: Lemma.ID? = nil, graph: Lexicon.Graph) {
+			self.init(
+				old: old,
+				new: new,
+				document: Lexicon.Document(graph),
+				graph: graph
+			)
+		}
+
+		init(document: Lexicon.Document) throws {
+			try self.init(document: document, graph: document.graph())
+		}
+
+		static func == (lhs: Self, rhs: Self) -> Bool {
+			lhs.old == rhs.old &&
+			lhs.new == rhs.new &&
+			lhs.graph == rhs.graph &&
+			TaskPaper.encode(lhs.document) == TaskPaper.encode(rhs.document)
+		}
 	}
 
 	static let readableContentTypes: [UTType] = [.lexicon, .taskpaper]
@@ -63,7 +96,7 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
         switch configuration.contentType {
                 
 			case .lexicon, .taskpaper:
-				snapshot = try Snapshot(graph: TaskPaper(data).decode())
+				snapshot = try Snapshot(document: TaskPaper(data).decodeDocument())
                 file = configuration.file
                 
             default:
@@ -73,11 +106,16 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 	
 	func update(with new: Snapshot, undo manager: UndoManager?) {
 		
-		guard new.graph != snapshot.graph else {
+		guard new != snapshot else {
 			return
 		}
 		
-		let old = Snapshot(old: new.new, new: new.old, graph: snapshot.graph)
+		let old = Snapshot(
+			old: new.new,
+			new: new.old,
+			document: snapshot.document,
+			graph: snapshot.graph
+		)
 		self.snapshot = new
 		
 		manager?.registerUndo(withTarget: self) { [old, manager] my in
@@ -96,7 +134,7 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
         switch configuration.contentType {
                 
 			case .lexicon, .taskpaper:
-				data = try TaskPaper.encode(snapshot.graph).data(using: .utf8).try()
+				data = try TaskPaper.encode(snapshot.document).data(using: .utf8).try()
                 
             default:
 				guard

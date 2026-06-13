@@ -49,12 +49,14 @@ extension Editor {
 					}
 					let cli = CLI.with(lemma: lemma)
 					let graph = lemma.lexicon.graph
+					let document = lemma.lexicon.document
 					Task { @MainActor in
 						let old = self.cli
 						self.cli = cli
 						self.snapshot = Document.Snapshot(
 							old: old.lemma.id,
 							new: lemma.id,
+							document: document,
 							graph: graph
 						)
 					}
@@ -102,7 +104,7 @@ extension Editor {
 			
 			self.document = document
             
-			var lemma = await Lexicon.from(document.snapshot.graph).root
+			var lemma = await Self.root(for: document.snapshot)
 			if let id = document.snapshot.new, let o = await lemma.lexicon[id] {
 				lemma = o
 			}
@@ -124,7 +126,7 @@ extension Editor {
 					return
 				}
 				
-				let root = Lexicon.from(snapshot.graph).root
+				let root = Self.root(for: snapshot)
 				let lemma = snapshot.new.flatMap{ root.lexicon[$0] } ?? root.lexicon[cli.lemma.id]
 				
 				if let lemma = lemma {
@@ -145,6 +147,10 @@ extension Editor {
 }
 
 extension Editor.Object {
+
+	@LexiconActor private static func root(for snapshot: Document.Snapshot) -> Lemma {
+		(try? Lexicon.from(snapshot.document).root) ?? Lexicon.from(snapshot.graph).root
+	}
 	
 	@LexiconActor static func backwards(cli: CLI, back: [Lemma.ID], forward: [Lemma.ID]) async -> (cli: CLI?, back: [Lemma.ID], forward: [Lemma.ID]) {
 		let (lemma, back, forward) = backwards(lemma: cli.lemma, back: back, forward: forward)
