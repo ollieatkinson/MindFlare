@@ -9,7 +9,17 @@ import UniformTypeIdentifiers
 
 extension Editor {
     
-    @MainActor final class Object: EventContext {
+    @MainActor final class Object: EventContext, ObservableObject {
+
+		private static var instances: [UInt: Weak<Object>] = [:]
+
+		static func instance(id: UInt) -> Object? {
+			guard let instance = instances[id]?.reference else {
+				instances[id] = nil
+				return nil
+			}
+			return instance
+		}
 		
 		@Published var ui: CLI.UI.Editor
 		@Published var snapshot: Document.Snapshot
@@ -22,11 +32,11 @@ extension Editor {
 		var document: Document
 		var focusedDocumentID: UInt?
 		
-        lazy var then = context{ my in my.isFocused && my.isViewing }
-        lazy var inFocus = context(\.isFocused)
-        lazy var inBrowser = context(\.isBrowsing)
-		lazy var inRenaming = context(\.isRenaming)
-		lazy var inGraphNode = context{ my in my.isFocused && my.isInGraphNode } // TODO: use
+        lazy var then = mainContext { my in my.isFocused && my.isViewing }
+        lazy var inFocus = mainContext { my in my.isFocused }
+        lazy var inBrowser = mainContext { my in my.isBrowsing }
+		lazy var inRenaming = mainContext { my in my.isRenaming }
+		lazy var inGraphNode = mainContext { my in my.isFocused && my.isInGraphNode } // TODO: use
 
         var nextLemma: Lemma? {
             didSet {
@@ -70,7 +80,7 @@ extension Editor {
 				}
 				Task {
 					ui = await cli.ui(context: .viewing)
-					doc.editor.cli[cli].did.change >> events
+					doc.editor.cli.did.change >> events
 				}
             }
         }
@@ -98,6 +108,7 @@ extension Editor {
 			}
 			cli = await CLI(lemma)
             ui = await cli.ui(context: .viewing)
+			Self.instances[id] = Weak(self)
 			
             bear.in(mind)
         }

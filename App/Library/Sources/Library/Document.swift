@@ -7,7 +7,7 @@ import Lexicon
 import LexiconGenerators
 import UniformTypeIdentifiers
 
-final class Document: Identifiable, Equatable, ReferenceFileDocument, CustomStringConvertible {
+final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDocument, CustomStringConvertible {
 	
 	static func == (lhs: Document, rhs: Document) -> Bool {
 		lhs === rhs
@@ -27,7 +27,7 @@ final class Document: Identifiable, Equatable, ReferenceFileDocument, CustomStri
 	@Published private(set) var snapshot: Snapshot
 	@Published var isExporting = false
 	
-	var export: (generator: CodeGenerator.Type, json: Lexicon.Graph.JSON)? {
+	var export: (generator: LexiconSourceGenerator, json: Lexicon.Graph.JSON)? {
 		didSet {
 			isExporting = export != nil
 		}

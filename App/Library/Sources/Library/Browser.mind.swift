@@ -23,11 +23,11 @@ extension Browser.Object {
         doc.browser.cli.commit >> then { my, event in
             switch my.uiContext {
                     
-                case .inheriting:
-                    my.doc.browser.cli.lemma.add.inheritance[my.cli.lemma] >> my.events
-                    
-                case .synonym:
-                    my.doc.browser.cli.lemma.add.protonym[my.cli.lemma] >> my.events
+					case .inheriting:
+	                    my.doc.browser.cli.lemma.add.inheritance[my.cli.lemma.id] >> my.events
+
+					case .synonym:
+                    my.doc.browser.cli.lemma.add.protonym[my.cli.lemma.id] >> my.events
                     
                 default:
                     break
@@ -35,7 +35,10 @@ extension Browser.Object {
         }
         
         doc.browser.column.cell.event.tap >> then { my, event in
-            guard let lemma: Lemma = try? event[app.document.browser.column.cell] else {
+            guard
+				let id: Lemma.ID = try? event[app.document.browser.column.cell, as: Lemma.ID.self],
+				let lemma = await my.cli.lemma.lexicon[id]
+			else {
                 return
             }
             if my.uiContext == .synonym {
@@ -67,7 +70,10 @@ extension Browser.Object {
         }
         
         doc.browser.cli.append >> then { my, event in
-            guard let c: Character = try? event[] else { return }
+            guard
+				let string: String = try? event[type: String.self],
+				let c = string.first
+			else { return }
             my.cli = await my.cli.appending(c)
         }
         

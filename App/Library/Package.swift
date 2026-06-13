@@ -1,20 +1,27 @@
-// swift-tools-version:5.5
+// swift-tools-version: 6.3
 
 import PackageDescription
 
 let package = Package(
 	name: "Library",
 	platforms: [
-		.macOS(.v12),
+		.macOS(.v15),
 	],
 	products: [
 		.library(name: "Library", targets: ["Library"]),
 	],
 	dependencies: [
-		.package(url: "https://github.com/screensailor/Hope", .branch("trunk")),
-		.package(url: "https://github.com/thousandyears/Lexicon", .branch("trunk")),
-		.package(url: "https://github.com/apple/swift-collections", from: "1.0.0"),
-		.package(url: "https://github.com/apple/swift-algorithms", from: "1.0.0"),
+		.package(url: "https://github.com/screensailor/Hope", branch: "trunk"),
+		.package(
+			url: "https://github.com/ollieatkinson/Lexicon.git",
+			branch: "trunk",
+			traits: [
+				.defaults,
+				.trait(name: "Editor"),
+			]
+		),
+		.package(url: "https://github.com/apple/swift-collections", from: "1.5.1"),
+		.package(url: "https://github.com/apple/swift-algorithms", from: "1.2.0"),
 	],
 	targets: [
 		.target(

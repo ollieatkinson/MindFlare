@@ -2,7 +2,7 @@
 // github.com/screensailor 2022
 //
 
-public struct Weak<Reference: AnyObject>: ExpressibleByNilLiteral {
+public struct Weak<Reference: AnyObject>: @unchecked Sendable, ExpressibleByNilLiteral {
     
     public private(set) weak var reference: Reference?
     

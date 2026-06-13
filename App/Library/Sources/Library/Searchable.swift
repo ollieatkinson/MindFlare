@@ -23,7 +23,7 @@ struct Searchable<A: L & I_app_ui_search>: ViewModifier {
     
     let search: K<A>
     
-    @StateObject var my: Lexicon.Search
+    @StateObject var my: LexiconSearchModel
     
     func body(content: Content) -> some View {
         content
@@ -36,7 +36,7 @@ struct Searchable<A: L & I_app_ui_search>: ViewModifier {
                         .searchCompletion(id)
                 }
             }
-            .onChange(of: query) { query in
+            .onChange(of: query) { _, query in
                 guard query != submitted else {
                     return
                 }
@@ -56,7 +56,7 @@ struct Searchable<A: L & I_app_ui_search>: ViewModifier {
     
     init(_ search: K<A>, in lexicon: Binding<Lexicon>) {
         self.search = search
-        self._my = .init(wrappedValue: Lexicon.Search(in: lexicon))
+        self._my = .init(wrappedValue: LexiconSearchModel(in: lexicon))
     }
     
     struct Child: ViewModifier {

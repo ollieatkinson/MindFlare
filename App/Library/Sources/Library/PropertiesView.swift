@@ -69,7 +69,7 @@ struct Synonym: View {
         }
         .onTapGesture {
             // TODO: dedicated event ↓
-            app.document[id].browser.column.section.heading[protonym].event.tap >> events
+            app.document[id].browser.column.section.heading[protonym.id].event.tap >> events
         }
     }
     
@@ -126,7 +126,7 @@ extension InheritanceList {
 				if lemma.isGraphNode {
 					
 					Button {
-						app.document[id].editor.cli.lemma.remove.inheritance[type] >> events
+						app.document[id].editor.cli.lemma.remove.inheritance[type.id] >> events
 					} label: {
 						Image(systemName: "xmark")
 							.foregroundColor(isHoveringOverInheritance ? NSColor.selectedMenuItemTextColor.ui : .clear)
@@ -146,7 +146,7 @@ extension InheritanceList {
             }
             .onTapGesture {
                 // TODO: dedicated event ↓
-                app.document[id].browser.column.section.heading[type].event.tap >> events
+                app.document[id].browser.column.section.heading[type.id].event.tap >> events
             }
         }
         

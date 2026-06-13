@@ -5,11 +5,15 @@
 import Lexicon
 import Foundation
 
+private struct ResourceLookupError: Error, CustomStringConvertible {
+	let description: String
+}
+
 extension String {
 	
 	func url(from bundle: Bundle = .module, directory path: String = "Resources/") throws -> URL {
 		guard let url = bundle.url(forResource: "\(path)\(self)", withExtension: nil) else {
-			throw "Could not find '\(self)'"
+			throw ResourceLookupError(description: "Could not find '\(self)'")
 		}
 		return url
 	}

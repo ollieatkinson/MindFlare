@@ -42,7 +42,7 @@ extension CLI {
                 }
                 
                 if event.keyCode == .escKey {
-                    app.menu.edit.cancel >> events
+                    events.send(Event(app.menu.edit.cancel))
                     return
                 }
 
@@ -53,25 +53,25 @@ extension CLI {
 
                     case (.delete?, _), (.leftArrow?, _):
                         if event.modifierFlags.contains(.command) {
-                            cli.reset >> events
+                            events.send(Event(cli.reset))
                         } else {
-                            cli.backspace >> events
+                            events.send(Event(cli.backspace))
                         }
 
                     case (.tab?, _), (.rightArrow?, _), (_, " "), (_, "."):
-                        cli.enter >> events
+                        events.send(Event(cli.enter))
                         
                     case (.upArrow?, _):
-                        cli.select.previous >> events
+                        events.send(Event(cli.select.previous))
                         
                     case (.downArrow?, _):
-                        cli.select.next >> events
+                        events.send(Event(cli.select.next))
                         
 					case (_, let c?)
 						where event.modifierFlags.isDisjoint(with: [.control, .option, .command])
 						&& c.count == 1:
 						
-                        cli.append[c.first!] >> events
+                        events.send(Event(cli.append[String(c.first!)]))
                         
                     default:
                         break

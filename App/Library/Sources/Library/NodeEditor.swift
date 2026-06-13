@@ -9,13 +9,13 @@ extension View {
     
     @MainActor
     func nodeEditor(cli: CLI, name: Binding<Lemma.Name>, isPopped: Binding<Bool>, arrowEdge: Edge = .bottom) -> some View {
-        modifier(NodeEditor(my: .init(lemma: cli.lemma), name: name, isPopped: isPopped))
+        modifier(NodeEditor(my: NodeEditor.Object(lemma: cli.lemma), name: name, isPopped: isPopped))
     }
 }
 
 extension NodeEditor {
     
-    @MainActor final class Object: EventContext {
+    @MainActor final class Object: EventContext, ObservableObject {
         
         @Environment(\.events) var events
         

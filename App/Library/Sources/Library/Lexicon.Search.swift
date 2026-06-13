@@ -7,14 +7,8 @@ import Combine
 import Foundation
 import SwiftUI
 
-extension Lexicon {
-    
-    @MainActor class Search: EventContext {
-        
-        @Environment(\.events) var events: Events
-
+@MainActor final class LexiconSearchModel: ObservableObject {
         @Binding var lexicon: Lexicon
-        nonisolated var description: String { "Lexicon search" }
         
         @Published var suggestions: [String] = []
         
@@ -70,7 +64,6 @@ extension Lexicon {
                 }
             }
         }
-    }
 }
 
 extension Lexicon {

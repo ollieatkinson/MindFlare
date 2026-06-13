@@ -7,7 +7,7 @@ import Lexicon
 
 extension Browser {
     
-    @MainActor final class Object: EventContext {
+    @MainActor final class Object: EventContext, ObservableObject {
 		
 		@Published var ui: CLI.UI.Browser
         
@@ -18,12 +18,12 @@ extension Browser {
 		
         @Environment(\.events) var events
         
-        lazy var then = context()
+        lazy var then = mainContext()
         
         var cli: CLI {
             didSet {
                 guard cli != oldValue else { return }
-                app.document[id].browser.cli[cli].did.change >> events
+                app.document[id].browser.cli.did.change >> events
             }
         }
 

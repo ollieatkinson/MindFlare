@@ -30,14 +30,20 @@ extension Editor.Object {
     @Bear var mindCLI: Mind {
         
         browser.column.cell.event.tap >> then { my, event in // TODO: animate the scroll
-            guard let lemma: Lemma = try? event[app.document.browser.column.cell] else {
+            guard
+				let id: Lemma.ID = try? event[app.document.browser.column.cell, as: Lemma.ID.self],
+				let lemma = await my.cli.lemma.lexicon[id]
+			else {
                 return
             }
             my.cli = await CLI(lemma)
         }
         
         browser.column.section.heading.event.tap >> then { my, event in
-            guard let lemma: Lemma = try? event[app.document.browser.column.section.heading] else {
+            guard
+				let id: Lemma.ID = try? event[app.document.browser.column.section.heading, as: Lemma.ID.self],
+				let lemma = await my.cli.lemma.lexicon[id]
+			else {
                 return
             }
             my.cli = await CLI(lemma)
@@ -48,7 +54,10 @@ extension Editor.Object {
         }
         
         browser.cli.append >> then { my, event in
-            guard let c: Character = try? event[] else { return }
+            guard
+				let string: String = try? event[type: String.self],
+				let c = string.first
+			else { return }
             my.cli = await my.cli.appending(c)
         }
         
@@ -101,7 +110,8 @@ extension Editor.Object {
         doc.browser.cli.lemma.add.inheritance >> inFocus { my, event in
             my.uiContext = .viewing
             guard
-				let type: Lemma = try? event[],
+				let id: Lemma.ID = try? event[type: Lemma.ID.self],
+				let type = await my.cli.lemma.lexicon[id],
 				let lemma = await my.cli.lemma.add(type: type)
 			else {
                 return
@@ -111,7 +121,10 @@ extension Editor.Object {
         
         doc.browser.cli.lemma.add.protonym >> inFocus { my, event in
             my.uiContext = .viewing
-            guard let lemma: Lemma = try? event[] else {
+            guard
+				let id: Lemma.ID = try? event[type: Lemma.ID.self],
+				let lemma = await my.cli.lemma.lexicon[id]
+			else {
                 return
             }
             guard let lemma = await my.cli.lemma.set(protonym: lemma) else {
@@ -122,7 +135,8 @@ extension Editor.Object {
         
         editor.cli.lemma.remove.inheritance >> then { my, event in
             guard
-                let type: Lemma = try? event[],
+                let id: Lemma.ID = try? event[type: Lemma.ID.self],
+				let type = await my.cli.lemma.lexicon[id],
                 let lemma = await my.cli.lemma.remove(type: type)
             else {
                 return
@@ -141,7 +155,7 @@ extension Editor.Object {
         
         editor.cli.lemma.rename.to >> inFocus { my, event in
             guard
-                let name: Lemma.Name = try? event[],
+                let name: Lemma.Name = try? event[type: Lemma.Name.self],
                 let lemma = await my.cli.lemma.rename(to: name)
             else {
                 return // TODO: log errors
@@ -154,7 +168,7 @@ extension Editor.Object {
         
         editor.search.query.did.submit >> then { my, event in
             guard
-                let id: String = try? event[app.document.editor.search.query],
+                let id: String = try? event[app.document.editor.search.query, as: String.self],
 				let lemma = await my.cli.lemma.lexicon[id]
             else {
                 return
@@ -167,7 +181,7 @@ extension Editor.Object {
 		
 		app.menu.file.export >> then { my, event in
 			guard
-				let name: String = try? event[],
+				let name: String = try? event[type: String.self],
 				let generator = Lexicon.Graph.JSON.generators[name]
 			else {
 				return
@@ -236,7 +250,7 @@ extension Editor.Object {
 				// TODO: move this ↓ validation to Lemma
 				my.cli.lemma.isGraphNode, // TODO: explain why to the user!
 				my.cli.lemma.parent != nil,
-                await my.cli.lemma.protonym == nil
+                await !my.cli.lemma.hasProtonym
             else {
                 return
             }
@@ -246,7 +260,7 @@ extension Editor.Object {
         app.menu.edit.paste.default >> then { my, event in
             guard
 				my.cli.lemma.isGraphNode,
-                await my.cli.lemma.protonym == nil,
+                await !my.cli.lemma.hasProtonym,
                 let string = pb
                     .string(forType: .string)?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -267,7 +281,7 @@ extension Editor.Object {
         app.menu.edit.paste.sentences >> then { my, event in
             guard
 				my.cli.lemma.isGraphNode,
-                await my.cli.lemma.protonym == nil,
+                await !my.cli.lemma.hasProtonym,
                 let string = pb.string(forType: .string)
             else {
                 return
@@ -293,7 +307,7 @@ extension Editor.Object {
             guard
 				my.cli.lemma.isGraphNode, // TODO: explain why to the user!
                 my.cli.lemma.parent != nil,
-				await my.cli.lemma.protonym == nil
+				await !my.cli.lemma.hasProtonym
             else {
                 return
             }
@@ -304,7 +318,7 @@ extension Editor.Object {
     @Bear var mindViewMenu: Mind {
         
         app.menu.view.stats >> then { my, event in
-            my.doc.editor[my].show.stats >> my.events // TODO: editor[my] is out of pattern
+            my.doc.editor.show.stats >> my.events
         }
         
         app.menu.view.back >> then { my, event in

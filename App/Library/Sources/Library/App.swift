@@ -24,7 +24,7 @@ import LexiconGenerators
 	
 	@Bear var mind: Mind {
 		
-		events.sink { event in
+		events.on { event in
 			print("🎙", event)
 		}
 	}
@@ -195,8 +195,9 @@ import LexiconGenerators
 private extension Button where Label == Text {
 	
 	init<A: L>(_ event: KeyPath<I_app_menu, A>, _ events: Events) {
+		let menuEvent = app.menu[keyPath: event]
 		self.init(A.localized) {
-			app.menu[keyPath: event] >> events
+			menuEvent >> events
 		}
 	}
 }

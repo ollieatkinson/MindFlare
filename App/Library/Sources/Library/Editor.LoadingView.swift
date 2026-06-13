@@ -26,8 +26,8 @@ extension Editor {
 					Editor(document: document, isExporting: $document.isExporting)
 						.as(my.doc.editor.view)
 						.environmentObject(my)
-						.focusedSceneValue(\.focusedDocumentID, id)
-                        .environment(\.focusedDocumentID, id)
+						.focusedSceneValue(\FocusedValues.focusedDocumentID, id)
+                        .environment(\EnvironmentValues.focusedDocumentID, id)
 				}
 			}
 			.as(app.document[id].view)

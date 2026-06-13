@@ -7,7 +7,7 @@ import Combine
 
 struct ColorSchemeButton: View {
     
-    enum Theme: String, CaseIterable {
+    enum Theme: String, CaseIterable, Codable {
         
         case dark
         case light
@@ -31,7 +31,7 @@ struct ColorSchemeButton: View {
             let i = Theme.allCases.firstIndex(of: theme)!
             theme = Theme.allCases.cycled().dropFirst(i + 1).first(where: { _ in true })!
             NSApp.appearance = theme.appearance
-            app.menu.view.theme[theme].toggle >> events
+            app.menu.view.theme[theme.rawValue].toggle >> events
         } label: {
             Group {
                 switch theme {

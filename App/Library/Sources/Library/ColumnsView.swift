@@ -92,7 +92,7 @@ struct ColumnChildGroupView: View {
                     .foregroundColor(.secondary)
                     .padding(insets)
                     .onTapGesture {
-                        app.document[id].browser.column.section.heading[type].event.tap >> events
+                        app.document[id].browser.column.section.heading[type.id].event.tap >> events
                     }
                 
                 Divider()
@@ -175,10 +175,10 @@ struct ColumnCell: View {
         .contentShape(Rectangle())
         .cornerRadius(4)
         .onTapGesture {
-            app.document[id].browser.column.cell[ui.lemma].event.tap >> events
+            app.document[id].browser.column.cell[ui.lemma.id].event.tap >> events
         }
         .onRightClick{
-            app.document[id].browser.column.cell[ui.lemma].event.tap >> events
+            app.document[id].browser.column.cell[ui.lemma.id].event.tap >> events
         }
         .contextMenu {
             if my.uiContext == .viewing, !ui.isIherited {
@@ -246,9 +246,9 @@ struct ColumnCell: View {
 private extension Button where Label == Text {
     
     init<A: L>(_ event: KeyPath<I_app_menu, A>, _ events: Events) {
+        let menuEvent = app.menu[keyPath: event]
         self.init(A.localized) {
-            
-            app.menu[keyPath: event] >> events
+            menuEvent >> events
         }
     }
 }

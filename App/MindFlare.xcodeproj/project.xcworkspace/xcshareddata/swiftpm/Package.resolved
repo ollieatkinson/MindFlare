@@ -1,61 +1,69 @@
 {
-  "object": {
-    "pins": [
-      {
-        "package": "Hope",
-        "repositoryURL": "https://github.com/screensailor/Hope",
-        "state": {
-          "branch": "trunk",
-          "revision": "b76209cf412ba8a78941a298ff0c5d2a58cc4e6a",
-          "version": null
-        }
-      },
-      {
-        "package": "Lexicon",
-        "repositoryURL": "https://github.com/thousandyears/Lexicon",
-        "state": {
-          "branch": "trunk",
-          "revision": "e4b2681dde4755154eed23dcef89f594ead0565e",
-          "version": null
-        }
-      },
-      {
-        "package": "swift-algorithms",
-        "repositoryURL": "https://github.com/apple/swift-algorithms",
-        "state": {
-          "branch": null,
-          "revision": "b14b7f4c528c942f121c8b860b9410b2bf57825e",
-          "version": "1.0.0"
-        }
-      },
-      {
-        "package": "swift-argument-parser",
-        "repositoryURL": "https://github.com/apple/swift-argument-parser",
-        "state": {
-          "branch": null,
-          "revision": "8f4d2753f0e4778c76d5f05ad16c74f707390531",
-          "version": "1.2.3"
-        }
-      },
-      {
-        "package": "swift-collections",
-        "repositoryURL": "https://github.com/apple/swift-collections",
-        "state": {
-          "branch": null,
-          "revision": "937e904258d22af6e447a0b72c0bc67583ef64a2",
-          "version": "1.0.4"
-        }
-      },
-      {
-        "package": "swift-numerics",
-        "repositoryURL": "https://github.com/apple/swift-numerics",
-        "state": {
-          "branch": null,
-          "revision": "0a5bc04095a675662cf24757cc0640aa2204253b",
-          "version": "1.0.2"
-        }
+  "originHash" : "65bab519bea3b01c6f3ccf50774f2d63905d4b85ba1367a1ed0b6ffef52a5237",
+  "pins" : [
+    {
+      "identity" : "hope",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/screensailor/Hope",
+      "state" : {
+        "branch" : "trunk",
+        "revision" : "b76209cf412ba8a78941a298ff0c5d2a58cc4e6a"
       }
-    ]
-  },
-  "version": 1
+    },
+    {
+      "identity" : "lexicon",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ollieatkinson/Lexicon.git",
+      "state" : {
+        "branch" : "trunk",
+        "revision" : "4145d9a04dc4f1e139f9f92a4935c44672ea94da"
+      }
+    },
+    {
+      "identity" : "swift-algorithms",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-algorithms",
+      "state" : {
+        "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
+        "version" : "1.2.1"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser",
+      "state" : {
+        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+        "version" : "1.8.2"
+      }
+    },
+    {
+      "identity" : "swift-async-algorithms",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-async-algorithms",
+      "state" : {
+        "revision" : "d0b4a06d0f173a2f3be27d3ea21b3c3aa18db440",
+        "version" : "1.1.4"
+      }
+    },
+    {
+      "identity" : "swift-collections",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-collections",
+      "state" : {
+        "revision" : "a0cb0954ecb21e4e31b0070e6ed5674e8556685a",
+        "version" : "1.6.0"
+      }
+    },
+    {
+      "identity" : "swift-numerics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-numerics.git",
+      "state" : {
+        "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
+        "version" : "1.1.1"
+      }
+    }
+  ],
+  "version" : 3
 }

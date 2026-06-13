@@ -13,19 +13,6 @@ struct StatsButton: View {
     
     @State var my: Editor.Object?
     
-    @State var bear: Mind = []
-    
-    @Bear var mind: Mind {
-        
-        app.document[id].editor.show.stats >> events.then { event in
-            guard my == nil else {
-                my = nil
-                return
-            }
-            my = try? event[app.document.editor]
-        }
-    }
-    
     var body: some View {
         Button {
             app.menu.view.stats >> events
@@ -33,11 +20,15 @@ struct StatsButton: View {
             Label("Stats", systemImage: "flame")
         }
         .help("Show Stats (⌘ L)")
+        .on(app.document[id].editor.show.stats) { _ in
+            guard my == nil else {
+                my = nil
+                return
+            }
+            my = Editor.Object.instance(id: id)
+        }
         .popover(item: $my) { my in
             StatsView().environmentObject(my)
-        }
-        .onAppear {
-            bear.in(mind)
         }
     }
 }

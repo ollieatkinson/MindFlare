@@ -28,6 +28,6 @@ extension EnvironmentValues {
         set { self[FocusedDocumentIDKey.self] = newValue }
     }
     private struct FocusedDocumentIDKey: EnvironmentKey {
-        static var defaultValue: UInt?
+        static let defaultValue: UInt? = nil
     }
 }
