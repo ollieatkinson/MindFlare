@@ -8,80 +8,82 @@ import Foundation
 import SwiftUI
 
 @MainActor final class LexiconSearchModel: ObservableObject {
-        @Binding var lexicon: Lexicon
-        
-        @Published var suggestions: [String] = []
-        
-        var query: String = "" { didSet { stream.send(query) }}
-        var store: [String: [String]] = [:]
-        
-        private var task: Task<(), Error>?
-        
-        private let stream = PassthroughSubject<String, Never>()
-        private var bag: Set<AnyCancellable> = []
-        
-        init(in lexicon: Binding<Lexicon>) {
-            self._lexicon = lexicon
-            stream
-                .debounce(for: 0.1, scheduler: RunLoop.main)
-                .removeDuplicates()
-                .sink{ query in self.update(to: query) }
-                .store(in: &bag)
-        }
-        
-        private func update(to query: String) {
-            task?.cancel()
-            
-            guard !query.isEmpty else {
-                store = [:]
-                suggestions = []
-                return
-            }
-            
-            let needle = query.localizedLowercase.replacingOccurrences(of: " ", with: ".")
-            
-            if let stored = store[needle] {
-                suggestions = stored
-                return
-            }
-            
-            task = Task.detached { @Sendable [weak self] in
-                
-                guard let self = self else { return }
-                
-                try Task.checkCancellation()
-                
-                let (lemma, prefixes) = await self.lexicon.rootAndPrefixes(in: needle)
-                
-                let suggestions = await lemma.find(prefixes, max: 1000).map(\.id)
-                
-                Task { @MainActor [weak self] in
-                    guard let self = self else { return }
-                    self.store[needle] = suggestions
-                    try Task.checkCancellation()
-                    guard query == self.query else { return }
-                    self.suggestions = suggestions
-                }
-            }
-        }
-}
+	@Binding var lexicon: Lexicon
 
-extension Lexicon {
-    
-    func rootAndPrefixes(in string: String) -> (lemma: Lemma, prefixes: [String]) {
-        var prefixes = string.components(separatedBy: ".")
-        guard prefixes.first == root.name else {
-            return (root, prefixes)
-        }
-        var lemma = root
-        prefixes.removeFirst()
-        while let name = prefixes.first {
-            guard let child = lemma.ownChildren[name] else {
-                break
-            }
-            lemma = child
-            prefixes.removeFirst()
-        }
-        return (lemma, prefixes.filter{ !$0.isEmpty })
-    }
+	@Published var suggestions: [String] = []
+
+	var query: String = "" { didSet { stream.send(query) }}
+	var store: [String: [String]] = [:]
+
+	private var task: Task<(), Error>?
+
+	private let stream = PassthroughSubject<String, Never>()
+	private var bag: Set<AnyCancellable> = []
+
+	init(in lexicon: Binding<Lexicon>) {
+		self._lexicon = lexicon
+		stream
+			.debounce(for: 0.1, scheduler: RunLoop.main)
+			.removeDuplicates()
+			.sink{ query in self.update(to: query) }
+			.store(in: &bag)
+	}
+
+	private func update(to query: String) {
+		task?.cancel()
+
+		let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+
+		guard !query.isEmpty else {
+			store = [:]
+			suggestions = []
+			return
+		}
+
+		let cacheKey = query.localizedLowercase
+
+		if let stored = store[cacheKey] {
+			suggestions = stored
+			return
+		}
+
+		task = Task.detached { @Sendable [weak self] in
+
+			guard let self = self else { return }
+
+			try Task.checkCancellation()
+
+			let document = await self.lexicon.document
+			let suggestions = await Self.suggestions(for: query, in: document)
+
+			Task { @MainActor [weak self] in
+				guard let self = self else { return }
+				self.store[cacheKey] = suggestions
+				try Task.checkCancellation()
+				guard query == self.query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+				self.suggestions = suggestions
+			}
+		}
+	}
+
+	private static func suggestions(for query: String, in document: Lexicon.Document) async -> [String] {
+		let options = Lexicon.Search.Options(
+			limit: 1000,
+			mode: .hybrid,
+			scope: .live,
+			bounds: .init(depth: 4, candidates: 200, budget: 10_000)
+		)
+		let index = Lexicon.Search.Index(document: document, options: options)
+
+		do {
+			return try await index.search(query, in: document).map(\.id)
+		} catch {
+			let fallback = Lexicon.Search.Options(
+				limit: 1000,
+				mode: [.lexical, .token],
+				scope: .own
+			)
+			return document.search(query, options: fallback).map(\.id)
+		}
+	}
 }
