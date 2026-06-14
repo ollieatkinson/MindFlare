@@ -70,12 +70,26 @@ struct CompositionDiagnosticsView: View {
 
 	var body: some View {
 		if !diagnostics.isEmpty {
-			HStack(spacing: 6) {
-				Image(systemName: "exclamationmark.triangle.fill")
-				Text("\(diagnostics.count) Lexicon composition issue\(diagnostics.count == 1 ? "" : "s")")
+			VStack(alignment: .leading, spacing: 3) {
+				HStack(spacing: 6) {
+					Image(systemName: "exclamationmark.triangle.fill")
+					Text("\(diagnostics.count) Lexicon composition issue\(diagnostics.count == 1 ? "" : "s")")
+				}
+				.foregroundColor(.orange)
+
+				if let diagnostic = diagnostics.first {
+					Text(diagnostic)
+						.foregroundStyle(.secondary)
+						.lineLimit(3)
+				}
+
+				if diagnostics.count > 1 {
+					Text("\(diagnostics.count - 1) more issue\(diagnostics.count == 2 ? "" : "s")")
+						.foregroundStyle(.secondary)
+				}
 			}
 			.font(.caption)
-			.foregroundColor(.orange)
+			.frame(maxWidth: .infinity, alignment: .leading)
 			.help(diagnostics.joined(separator: "\n"))
 		}
 	}
@@ -84,10 +98,10 @@ struct CompositionDiagnosticsView: View {
 #if DEBUG
 #Preview("Composition diagnostics") {
 	CompositionDiagnosticsView(diagnostics: [
-		"importResolution conflict at ./shared.lexicon: unresolved <> local",
-		"defaultValue conflict at app.document.editor: true <> false",
+		"Could not resolve local Lexicon import for organization.products. MindFlare looks for relative imports under /Users/example/Vocabulary. Check that the referenced .lexicon file exists there and that macOS granted folder access.",
+		"Conflicting default values at app.document.editor: true and false. Move the shared value into one imported lexicon or make the local override explicit.",
 	])
 	.padding()
-	.frame(width: 420, alignment: .leading)
+	.frame(width: 520, alignment: .leading)
 }
 #endif

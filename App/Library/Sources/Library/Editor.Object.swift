@@ -161,7 +161,7 @@ extension Editor.Object {
 			return try snapshot.composing(relativeTo: fileURL)
 		} catch {
 			var snapshot = snapshot
-			snapshot.compositionDiagnostics = [String(describing: error)]
+			snapshot.compositionDiagnostics = [Document.Snapshot.compositionFailureDescription(error, sourceURL: fileURL)]
 			return snapshot
 		}
 	}

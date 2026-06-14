@@ -91,8 +91,34 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 					document: document,
 					composed: plan.document,
 					graph: plan.document.graph(root: graph.root.name),
-					compositionDiagnostics: plan.conflicts.map(\.description)
+					compositionDiagnostics: Self.compositionDiagnostics(for: plan.conflicts, sourceURL: sourceURL)
 				)
+			}
+		}
+
+		static func compositionFailureDescription(_ error: Error, sourceURL: URL?) -> String {
+			if let sourceURL {
+				return "Could not compose Lexicon imports for \(sourceURL.lastPathComponent): \(error.localizedDescription). Check that imported files are readable and use paths relative to \(sourceURL.deletingLastPathComponent().path)."
+			}
+			return "Could not compose Lexicon imports: \(error.localizedDescription). Save the document before using relative imports."
+		}
+
+		private static func compositionDiagnostics(for conflicts: [Lexicon.MergeConflict], sourceURL: URL) -> [String] {
+			let basePath = sourceURL.deletingLastPathComponent().path
+			return conflicts.map { conflict in
+				switch conflict.kind {
+					case .importResolution:
+						if conflict.incoming == Lexicon.Import.Location.local.rawValue {
+							return "Could not resolve local Lexicon import for \(conflict.path). MindFlare looks for relative imports under \(basePath). Check that the referenced .lexicon file exists there and that macOS granted folder access."
+						}
+						return "Could not resolve remote Lexicon import \(conflict.path). Remote imports are disabled for document composition."
+					case .defaultValue:
+						return "Conflicting default values at \(conflict.path): \(conflict.existing) and \(conflict.incoming). Move the shared value into one imported lexicon or make the local override explicit."
+					case .nodeKind:
+						return "Conflicting Lexicon node kinds at \(conflict.path): \(conflict.existing) and \(conflict.incoming). Rename one branch or make the shared structure explicit before composing."
+					case .protonym:
+						return "Conflicting inheritance at \(conflict.path): \(conflict.existing) and \(conflict.incoming). Choose one parent term or split the local vocabulary into a separate branch."
+				}
 			}
 		}
 
