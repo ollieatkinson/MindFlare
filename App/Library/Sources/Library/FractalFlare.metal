@@ -193,7 +193,9 @@ static float segmentGlow(float2 point, float2 start, float2 end, float width) {
 	float4 profile2,
 	float4 profile3,
 	float4 profile4,
-	float designIndex
+	float designIndex,
+	float4 tuning0,
+	float4 tuning1
 ) {
 	float seed = profile0.x;
 	float paletteSeed = profile0.y;
@@ -215,6 +217,11 @@ static float segmentGlow(float2 point, float2 start, float2 end, float width) {
 	float lobeWeight = profile4.y;
 	float synonymWeight = profile4.z;
 	float nodeMass = profile4.w;
+	float intensityControl = max(tuning0.x, 0.0);
+	float turbulenceControl = max(tuning0.y, 0.0);
+	float structureControl = max(tuning0.z, 0.05);
+	float hueControl = tuning0.w;
+	float glowControl = max(tuning1.x, 0.0);
 
 	float2 dimensions = max(size, float2(1.0));
 	float2 uv = float2(position.x / dimensions.x, 1.0 - position.y / dimensions.y);
@@ -223,15 +230,16 @@ static float segmentGlow(float2 point, float2 start, float2 end, float width) {
 
 	int design = int(floor(designIndex + 0.5));
 	float countWeight = max(nodeWeight, nodeMass);
-	float energy = clamp(0.2 + countWeight * 0.26 + inheritanceWeight * 0.18 + synonymWeight * 0.14 + connectionWeight * 0.14 + lobeWeight * 0.12, 0.0, 1.0);
+	float energy = clamp((0.2 + countWeight * 0.26 + inheritanceWeight * 0.18 + synonymWeight * 0.14 + connectionWeight * 0.14 + lobeWeight * 0.12) * intensityControl, 0.0, 1.4);
 	float tempo = time * (0.72 + motionSeed * 0.58 + rhythmWeight * 0.36);
 	float lean = (horizontalBias - 0.5) * (0.16 + branchWeight * 0.08);
-	float field = flareFBM(point * (2.1 + branchWeight * 1.4) + float2(seed * 9.0, -tempo * 0.42), seed + foldSeed);
-	float3 ember = flareHSV(mix(0.01 + foldSeed * 0.025, accentHue, 0.04), 0.94, 1.0);
-	float3 amber = flareHSV(mix(0.075 + paletteSeed * 0.045, primaryHue, 0.08), 0.82, 1.0);
-	float3 hot = mix(flareHSV(mix(0.095 + shapeSeed * 0.04, coreHue, 0.08), 0.18, 1.0), float3(1.0, 0.98, 0.78), 0.72);
-	float3 violet = flareHSV(0.76 + paletteSeed * 0.18 + rhythmWeight * 0.08, 0.58 + metadataWeight * 0.24, 1.0);
-	float3 teal = flareHSV(0.49 + connectionWeight * 0.12 + foldSeed * 0.08, 0.7, 0.95);
+	float field = flareFBM(point * (1.2 + branchWeight * 1.1 + turbulenceControl * 1.2) + float2(seed * 9.0, -tempo * 0.42), seed + foldSeed);
+	float hueShift = hueControl * 0.18;
+	float3 ember = flareHSV(mix(0.01 + foldSeed * 0.025, accentHue, 0.04) + hueShift, 0.94, 1.0);
+	float3 amber = flareHSV(mix(0.075 + paletteSeed * 0.045, primaryHue, 0.08) + hueShift, 0.82, 1.0);
+	float3 hot = mix(flareHSV(mix(0.095 + shapeSeed * 0.04, coreHue, 0.08) + hueShift, 0.18, 1.0), float3(1.0, 0.98, 0.78), 0.72);
+	float3 violet = flareHSV(0.76 + paletteSeed * 0.18 + rhythmWeight * 0.08 + hueShift, 0.58 + metadataWeight * 0.24, 1.0);
+	float3 teal = flareHSV(0.49 + connectionWeight * 0.12 + foldSeed * 0.08 + hueShift, 0.7, 0.95);
 	float3 color = float3(0.0);
 
 	if (design == 0) {
@@ -327,7 +335,7 @@ static float segmentGlow(float2 point, float2 start, float2 end, float width) {
 		float plasma = pow(max(rings * 0.5 + 0.5, 0.0), 3.0) * smoothstep(0.55, 0.04, radius);
 		float core = exp(-radius * radius * (22.0 - countWeight * 5.0));
 		color = teal * cells * plasma * 0.72 + violet * plasma * (0.44 + connectionWeight * 0.4) + hot * core;
-	} else {
+	} else if (design == 9) {
 		float roots = 0.0;
 		float canopy = 0.0;
 		float2 base = float2(lean * 0.2, -0.4);
@@ -343,12 +351,130 @@ static float segmentGlow(float2 point, float2 start, float2 end, float width) {
 		}
 		float flameHalo = ellipseGlow(point, base + float2(0.0, 0.36), float2(0.28 + countWeight * 0.08, 0.44 + depthWeight * 0.1));
 		color = ember * flameHalo * 0.24 + amber * roots + hot * canopy + violet * canopy * metadataWeight * 0.42;
+	} else if (design == 10) {
+		float2 lensPoint = point * float2(0.86, 1.12) + float2(-lean * 0.22, 0.03);
+		float radius = length(lensPoint);
+		float lens = smoothstep(0.58, 0.03, radius);
+		float caustic = flareFBM(lensPoint * (4.0 + structureControl * 3.0) + float2(sin(tempo) * 0.7, -tempo * 0.58), seed + shapeSeed);
+		float flame = exp(-pow(abs(lensPoint.x + (caustic - 0.5) * 0.18 * turbulenceControl) / (0.18 + countWeight * 0.05), 2.0)) *
+			smoothstep(-0.46, -0.16, lensPoint.y) *
+			smoothstep(0.44 + depthWeight * 0.18, 0.08, lensPoint.y);
+		float ring = pow(abs(sin(radius * (18.0 + structureControl * 10.0) - tempo * 2.0)), 7.0) * lens;
+		color = teal * ring * 0.34 + ember * lens * 0.18 + amber * flame + hot * pow(flame, 2.2);
+	} else if (design == 11) {
+		float y = clamp(uv.y, 0.0, 1.0);
+		float sheets = 0.0;
+		float glow = 0.0;
+		for (int index = 0; index < 7; index += 1) {
+			float fi = float(index);
+			float sheetSeed = flareHash(seed * 9.2 + fi * 1.73 + foldSeed);
+			float side = fi / 6.0 - 0.5;
+			float fold = side * (0.14 + branchWeight * 0.1) * sin(y * M_PI_F);
+			fold += sin(y * (3.8 + sheetSeed * 5.0) + tempo * (0.55 + sheetSeed * 0.5)) * (0.035 + turbulenceControl * 0.025);
+			float width = mix(0.09 + countWeight * 0.02, 0.02 + leafWeight * 0.012, y);
+			float gate = smoothstep(0.02, 0.16, y) * smoothstep(0.92, 0.22, y);
+			float sheet = exp(-pow(abs(point.x - lean * y - fold) / max(width, 0.008), 2.0)) * gate;
+			sheets += sheet * (0.22 + sheetSeed * 0.16);
+			glow += pow(sheet, 2.8) * (0.18 + sheetSeed * 0.16);
+		}
+		color = ember * sheets * 0.28 + violet * sheets * 0.22 + amber * pow(sheets, 1.25) * 0.72 + hot * glow;
+	} else if (design == 12) {
+		float radius = length(point);
+		float angle = atan2(point.y, point.x + lean * 0.3);
+		float fieldLines = 0.0;
+		for (int index = 0; index < 9; index += 1) {
+			float fi = float(index);
+			float phase = fi / 9.0 * M_PI_F * 2.0 + seed * 6.28;
+			float line = sin(angle * (2.0 + structureControl * 2.0) + radius * (15.0 + branchWeight * 8.0) + phase - tempo * (0.9 + fi * 0.02));
+			fieldLines += pow(max(line * 0.5 + 0.5, 0.0), 12.0 - turbulenceControl * 3.0);
+		}
+		float hearth = exp(-pow(length(point * float2(1.2, 0.85)) / (0.22 + countWeight * 0.05), 2.0));
+		float mask = smoothstep(0.62, 0.06, radius);
+		color = teal * fieldLines * mask * 0.18 + amber * hearth * 0.65 + hot * pow(hearth, 2.0) + ember * mask * 0.1;
+	} else if (design == 13) {
+		float radius = length(point + float2(-lean * 0.2, 0.04));
+		float cloud = 0.0;
+		for (int octave = 0; octave < 5; octave += 1) {
+			float scale = pow(1.8, float(octave));
+			cloud += flareFBM(point * scale * (1.0 + structureControl * 0.4) + float2(seed * 4.0, -tempo * (0.18 + float(octave) * 0.05)), foldSeed + float(octave)) / scale;
+		}
+		float nebula = smoothstep(0.66, 0.04, radius) * pow(cloud, 2.0 + turbulenceControl);
+		float pulse = sin(radius * (24.0 + branchWeight * 10.0) - tempo * 3.2 + field * 2.0) * 0.5 + 0.5;
+		color = violet * nebula * 0.7 + teal * nebula * pulse * 0.35 + amber * pow(nebula, 2.0) * 0.5 + hot * pow(pulse * nebula, 4.0);
+	} else if (design == 14) {
+		float blot = flareFBM(point * (3.2 + structureControl * 2.4) + float2(seed * 5.0, -tempo * 0.32), foldSeed);
+		blot += flareFBM(point * (7.0 + turbulenceControl * 3.0) - float2(tempo * 0.28, shapeSeed * 4.0), seed) * 0.45;
+		float shape = smoothstep(0.62, 0.12, length(point * float2(0.9, 1.18))) * smoothstep(0.62, 0.28, blot);
+		float fissure = pow(abs(sin((point.x + point.y * 0.35 + blot * 0.12) * (36.0 + structureControl * 18.0) + tempo * 2.4)), 18.0);
+		float base = ellipseGlow(point, float2(lean * 0.1, -0.35), float2(0.24, 0.08));
+		color = ember * shape * 0.5 + amber * fissure * shape * 0.9 + hot * pow(fissure * shape, 2.4) + teal * base * 0.18;
+	} else if (design == 15) {
+		float radius = length(point * float2(1.0, 1.08));
+		float golden = 2.3999632;
+		float spiral = 0.0;
+		for (int index = 0; index < 13; index += 1) {
+			float fi = float(index);
+			float a = fi * golden + tempo * 0.25;
+			float r = 0.045 + sqrt(fi) * (0.055 + structureControl * 0.014);
+			float2 center = float2(cos(a), sin(a)) * r + float2(lean * 0.15, -0.03);
+			float petal = ellipseGlow(point, center, float2(0.046 + synonymWeight * 0.018, 0.08 + depthWeight * 0.018));
+			spiral += petal * (0.18 + fi * 0.012);
+		}
+		float flame = smoothstep(0.58, 0.02, radius) * spiral;
+		color = ember * flame * 0.28 + amber * pow(flame, 1.1) + hot * pow(flame, 2.4) + violet * spiral * metadataWeight * 0.22;
+	} else if (design == 16) {
+		float y = clamp(uv.y, 0.0, 1.0);
+		float center = lean * y * 0.5 + sin(y * 6.0 + tempo * 1.2 + seed * 6.28) * (0.018 + turbulenceControl * 0.012);
+		float width = mix(0.095 + countWeight * 0.018, 0.012 + leafWeight * 0.01, pow(y, 0.75));
+		float height = 0.82 + depthWeight * 0.08;
+		float gate = smoothstep(0.0, 0.08, y) * smoothstep(height, height - 0.12, y);
+		float flame = exp(-pow(abs(point.x - center) / width, 2.3)) * gate;
+		float spectral = pow(abs(sin((point.x - center) * (36.0 + structureControl * 20.0) + y * 5.0 + tempo)), 8.0) * flame;
+		color = amber * flame * 0.7 + hot * pow(flame, 2.0) + teal * spectral * 0.28 + violet * spectral * 0.22;
+	} else if (design == 17) {
+		float storm = 0.0;
+		float nodes = 0.0;
+		for (int index = 0; index < 18; index += 1) {
+			float fi = float(index);
+			float nodeSeed = flareHash(seed * 7.0 + fi * 4.7 + paletteSeed);
+			float a = nodeSeed * M_PI_F * 2.0 + tempo * (0.18 + nodeSeed * 0.12);
+			float r = 0.08 + flareHash(nodeSeed * 17.0 + fi) * (0.42 + structureControl * 0.08);
+			float2 start = float2(cos(a), sin(a)) * r * 0.28;
+			float2 end = float2(cos(a + 0.9 + field), sin(a + 0.9 + field)) * r;
+			storm += segmentGlow(point, start, end, 0.004 + connectionWeight * 0.006) * (0.35 + metadataWeight * 0.25);
+			nodes += ellipseGlow(point, end, float2(0.01 + synonymWeight * 0.012));
+		}
+		float core = ellipseGlow(point, float2(0.0, -0.02), float2(0.16 + countWeight * 0.04));
+		color = teal * storm * 0.75 + violet * storm * 0.4 + hot * nodes + amber * core * 0.28;
+	} else if (design == 18) {
+		float y = clamp(uv.y, 0.0, 1.0);
+		float facet = abs(point.x - lean * y) / mix(0.24 + countWeight * 0.05, 0.03, y);
+		float flame = smoothstep(1.18, 0.1, facet) * smoothstep(0.0, 0.08, y) * smoothstep(0.9, 0.24, y);
+		float prism = floor((atan2(point.y, point.x) + M_PI_F) / (M_PI_F * 2.0) * (5.0 + floor(structureControl * 5.0)));
+		float shimmer = flareHash(prism + floor((y + tempo * 0.12) * 10.0) + seed * 8.0);
+		float edge = pow(abs(1.0 - facet), 8.0) * flame;
+		color = mix(ember, teal, shimmer * 0.45) * flame * 0.55 + amber * pow(flame, 1.4) + hot * edge;
+	} else {
+		float arches = 0.0;
+		float glass = 0.0;
+		for (int index = 0; index < 9; index += 1) {
+			float fi = float(index);
+			float lane = fi / 8.0 - 0.5;
+			float archWidth = 0.06 + branchWeight * 0.025 + flareHash(fi + seed) * 0.025;
+			float column = exp(-pow(abs(point.x - lane * (0.38 + structureControl * 0.08) - lean * 0.18) / archWidth, 2.0));
+			float arch = exp(-pow(abs(length((point - float2(lane * 0.38 + lean * 0.18, -0.1)) * float2(1.0, 0.65)) - (0.25 + depthWeight * 0.05)) / 0.025, 2.0));
+			float gate = smoothstep(-0.5, -0.16, point.y) * smoothstep(0.46, 0.04, point.y);
+			arches += (column * 0.28 + arch * 0.48) * gate;
+			glass += column * flareHash(fi * 3.1 + paletteSeed) * gate;
+		}
+		float altar = ellipseGlow(point, float2(lean * 0.1, -0.36), float2(0.32, 0.07));
+		color = ember * altar * 0.36 + amber * arches * 0.62 + hot * pow(arches, 2.0) + violet * glass * 0.28 + teal * glass * connectionWeight * 0.24;
 	}
 
-	float halo = exp(-length(point + float2(-lean * 0.12, 0.08)) * (3.0 - energy * 0.8)) * (0.08 + energy * 0.16);
+	float halo = exp(-length(point + float2(-lean * 0.12, 0.08)) * (3.0 - energy * 0.8)) * (0.08 + energy * 0.16) * glowControl;
 	float vignette = smoothstep(0.68, 0.18, length(point));
 	float grain = mix(flareHash2(position + float2(time * 31.0, seed * 19.0)), 1.0, 0.94);
-	color = (color + ember * halo) * vignette * grain;
+	color = (color * intensityControl + ember * halo) * vignette * grain;
 	color = color / (color + 0.58);
 	return half4(half3(clamp(color, 0.0, 1.0)), sourceColor.a);
 }

@@ -112,6 +112,29 @@ enum FractalFlareDesign: Int, CaseIterable, Hashable, Identifiable {
 	case solarPetal
 	case plasmaReactor
 	case rootFire
+	case liquidLens
+	case foldedSilk
+	case magneticHearth
+	case pulseNebula
+	case inkIgnition
+	case goldenRatio
+	case spectralCandle
+	case neuralStorm
+	case prismFurnace
+	case emberCathedral
+
+	static let latestBatch: [Self] = [
+		.liquidLens,
+		.foldedSilk,
+		.magneticHearth,
+		.pulseNebula,
+		.inkIgnition,
+		.goldenRatio,
+		.spectralCandle,
+		.neuralStorm,
+		.prismFurnace,
+		.emberCathedral,
+	]
 
 	var id: Int {
 		rawValue
@@ -139,14 +162,46 @@ enum FractalFlareDesign: Int, CaseIterable, Hashable, Identifiable {
 				"Plasma reactor"
 			case .rootFire:
 				"Root fire"
+			case .liquidLens:
+				"Liquid lens"
+			case .foldedSilk:
+				"Folded silk"
+			case .magneticHearth:
+				"Magnetic hearth"
+			case .pulseNebula:
+				"Pulse nebula"
+			case .inkIgnition:
+				"Ink ignition"
+			case .goldenRatio:
+				"Golden ratio"
+			case .spectralCandle:
+				"Spectral candle"
+			case .neuralStorm:
+				"Neural storm"
+			case .prismFurnace:
+				"Prism furnace"
+			case .emberCathedral:
+				"Ember cathedral"
 		}
 	}
+}
+
+struct FractalFlareTuning: Hashable, Sendable {
+	var intensity: CGFloat = 1
+	var turbulence: CGFloat = 1
+	var structure: CGFloat = 1
+	var speed: CGFloat = 1
+	var hue: CGFloat = 0
+	var glow: CGFloat = 1
+
+	static let `default` = Self()
 }
 
 struct FractalFlareView: View {
 
 	let graph: Lexicon.Graph
 	var design: FractalFlareDesign? = nil
+	var tuning = FractalFlareTuning.default
 
 	@State private var profile: Profile?
 
@@ -160,7 +215,8 @@ struct FractalFlareView: View {
 							profile: profile,
 							size: geometry.size,
 							time: timeline.date.timeIntervalSinceReferenceDate,
-							design: design
+							design: design,
+							tuning: tuning
 						))
 				}
 			} else {
@@ -197,19 +253,27 @@ struct FractalFlareView: View {
 		name: "mindFlareFractalCandidate"
 	)
 
-	private static func shader(profile: Profile, size: CGSize, time: TimeInterval, design: FractalFlareDesign?) -> Shader {
+	private static func shader(
+		profile: Profile,
+		size: CGSize,
+		time: TimeInterval,
+		design: FractalFlareDesign?,
+		tuning: FractalFlareTuning
+	) -> Shader {
 		if let design {
 			return Shader(
 				function: candidateShaderFunction,
 				arguments: [
 					.float2(Float(size.width), Float(size.height)),
-					.float(Float((time * animationSpeed).truncatingRemainder(dividingBy: 10_000))),
+					.float(Float((time * animationSpeed * tuning.speed).truncatingRemainder(dividingBy: 10_000))),
 					.float4(Float(profile.seed), Float(profile.paletteSeed), Float(profile.shapeSeed), Float(profile.motionSeed)),
 					.float4(Float(profile.foldSeed), Float(profile.horizontalBias), Float(profile.nodeWeight), Float(profile.depthWeight)),
 					.float4(Float(profile.branchWeight), Float(profile.leafWeight), Float(profile.inheritanceWeight), Float(profile.metadataWeight)),
 					.float4(Float(profile.connectionWeight), Float(profile.rhythmWeight), Float(profile.primaryHue), Float(profile.accentHue)),
 					.float4(Float(profile.coreHue), Float(profile.lobeWeight), Float(profile.synonymWeight), Float(profile.nodeMass)),
 					.float(Float(design.rawValue)),
+					.float4(Float(tuning.intensity), Float(tuning.turbulence), Float(tuning.structure), Float(tuning.hue)),
+					.float4(Float(tuning.glow), 0, 0, 0),
 				]
 			)
 		}
@@ -651,33 +715,86 @@ private struct FractalFlareDesignGalleryView: View {
 
 	let graph: Lexicon.Graph
 
+	@State private var tuning = FractalFlareTuning(
+		intensity: 1.15,
+		turbulence: 1.05,
+		structure: 1,
+		speed: 1.15,
+		hue: 0,
+		glow: 1.1
+	)
+
 	private let columns = Array(
 		repeating: GridItem(.fixed(164), spacing: 18, alignment: .top),
 		count: 5
 	)
 
 	var body: some View {
-		ScrollView {
-			LazyVGrid(columns: columns, spacing: 18) {
-				ForEach(FractalFlareDesign.allCases) { design in
-					VStack(spacing: 8) {
-						FractalFlareView(graph: graph, design: design)
-							.frame(width: 148, height: 148)
-						Text("\(design.rawValue + 1). \(design.title)")
-							.font(.caption)
-							.foregroundStyle(.secondary)
-							.lineLimit(1)
-					}
-					.frame(width: 164)
-				}
+		HStack(alignment: .top, spacing: 0) {
+			VStack(alignment: .leading, spacing: 14) {
+				Text("Fractal Lab")
+					.font(.title2)
+					.fontWeight(.semibold)
+				FractalFlareTuningSlider("Intensity", value: $tuning.intensity, range: 0.2...2.4)
+				FractalFlareTuningSlider("Turbulence", value: $tuning.turbulence, range: 0...2.4)
+				FractalFlareTuningSlider("Structure", value: $tuning.structure, range: 0.25...2.25)
+				FractalFlareTuningSlider("Speed", value: $tuning.speed, range: 0.1...2.8)
+				FractalFlareTuningSlider("Hue", value: $tuning.hue, range: -0.5...0.5)
+				FractalFlareTuningSlider("Glow", value: $tuning.glow, range: 0...2.2)
 			}
+			.frame(width: 220, alignment: .topLeading)
 			.padding(24)
+
+			Divider()
+
+			ScrollView {
+				LazyVGrid(columns: columns, spacing: 18) {
+					ForEach(FractalFlareDesign.latestBatch) { design in
+						VStack(spacing: 8) {
+							FractalFlareView(graph: graph, design: design, tuning: tuning)
+								.frame(width: 148, height: 148)
+							Text("\(design.rawValue + 1). \(design.title)")
+								.font(.caption)
+								.foregroundStyle(.secondary)
+								.lineLimit(1)
+						}
+						.frame(width: 164)
+					}
+				}
+				.padding(24)
+			}
 		}
-		.frame(width: 940, height: 460)
+		.frame(width: 1180, height: 500)
 	}
 }
 
-#if DEBUG
+private struct FractalFlareTuningSlider: View {
+
+	let title: String
+	@Binding var value: CGFloat
+	let range: ClosedRange<CGFloat>
+
+	init(_ title: String, value: Binding<CGFloat>, range: ClosedRange<CGFloat>) {
+		self.title = title
+		self._value = value
+		self.range = range
+	}
+
+	var body: some View {
+		VStack(alignment: .leading, spacing: 4) {
+			HStack {
+				Text(title)
+				Spacer()
+				Text(Double(value).formatted(.number.precision(.fractionLength(2))))
+					.foregroundStyle(.secondary)
+					.monospacedDigit()
+			}
+			.font(.caption)
+			Slider(value: $value, in: range)
+		}
+	}
+}
+
 #Preview("Fractal design gallery") {
 	FractalFlareDesignGalleryView(graph: FractalFlarePreview.systemGraph)
 }
@@ -790,4 +907,3 @@ private enum FractalFlarePreview {
 		"\t\tmempool:\n" +
 		"\t\tgossip:"
 }
-#endif
