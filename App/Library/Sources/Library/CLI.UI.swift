@@ -138,6 +138,8 @@ extension CLI {
 
 		let breadcrumbs = breadcrumbs
 		let root = breadcrumbs[0]
+		let breadcrumbIDs = Set(breadcrumbs.map(\.id))
+		let suggestionIDs = input.isEmpty ? nil : Set(suggestions.map(\.id))
 		var displayIDByTypeID = [Lemma.ID: String]()
 
 		let rootColumn = UI.Column(
@@ -174,18 +176,22 @@ extension CLI {
 			let sections: [UI.Column.Section] = lemma.childrenGroupedByTypeAndSorted
 
 				.map { (type, children) -> (type: Lemma, children: [Lemma]) in
-					guard input.isNotEmpty, lemma == breadcrumbs.last else {
+					guard let suggestionIDs, lemma == breadcrumbs.last else {
 						return (type, children)
 					}
 					return (
 						type: type,
-						children: children.filter(suggestions.contains)
+						children: children.filter { suggestionIDs.contains($0.id) }
 					)
 				}
 
 				.filter(\.children.isEmpty.not)
 				.enumerated()
 				.map { i, group in
+					let selectedIndex = group.children.firstIndex { child in
+						breadcrumbIDs.contains(child.id)
+					}
+					let children = group.children.visibleColumnChildren(around: selectedIndex)
 					let displayID = displayIDByTypeID[group.type.id] ?? {
 						let displayID = group.type.lineage.reversed().map(\.displayName).joined(separator: " ")
 						displayIDByTypeID[group.type.id] = displayID
@@ -197,9 +203,9 @@ extension CLI {
 						displayID: displayID,
 						type: group.type != lemma ? group.type : nil,
 						isFirst: i == 0,
-						rows: group.children.map { child in
+						rows: children.map { child in
 
-							let isSelected = breadcrumbs.contains(child)
+							let isSelected = breadcrumbIDs.contains(child.id)
 
 							if isSelected {
 								selectedRow = child.id
@@ -243,5 +249,29 @@ extension CLI {
 			isSynonym: lemma.protonym != nil,
 			protonym: lemma.protonym?.unwrapped
 		)
+	}
+}
+
+private enum ColumnWindow {
+	static let threshold = 560
+	static let leadingCount = 48
+	static let trailingCount = 24
+	static let selectedRadius = 180
+}
+
+private extension Array where Element == Lemma {
+
+	func visibleColumnChildren(around selectedIndex: Int?) -> [Element] {
+		guard count > ColumnWindow.threshold else {
+			return self
+		}
+		guard let selectedIndex else {
+			return Array(prefix(ColumnWindow.threshold))
+		}
+
+		var included = IndexSet(integersIn: 0..<Swift.min(ColumnWindow.leadingCount, count))
+		included.insert(integersIn: Swift.max(0, count - ColumnWindow.trailingCount)..<count)
+		included.insert(integersIn: Swift.max(0, selectedIndex - ColumnWindow.selectedRadius)..<Swift.min(count, selectedIndex + ColumnWindow.selectedRadius + 1))
+		return included.map { self[$0] }
 	}
 }

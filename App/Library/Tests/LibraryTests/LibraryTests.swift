@@ -291,6 +291,20 @@ final class LibraryTests: Hopes {
 		XCTAssertEqual(previous.lemma.id, "root.n_0499")
 	}
 
+	func testColumnsWindowLargeSiblingListsAroundSelection() async throws {
+		let root = await Self.largeSiblingRoot(count: 1_500)
+		let current = try await root.lexicon["root.n_0500"].try()
+		let cli = await CLI(current)
+		let ui = await cli.ui(context: .viewing)
+		let rootRows = ui.columns[1].sections.flatMap(\.rows)
+
+		XCTAssertLessThan(rootRows.count, 600)
+		XCTAssert(rootRows.contains { $0.id == "root.n_0000" })
+		XCTAssert(rootRows.contains { $0.id == "root.n_0500" })
+		XCTAssert(rootRows.contains { $0.id == "root.n_1499" })
+		XCTAssertFalse(rootRows.contains { $0.id == "root.n_1000" })
+	}
+
 	func testHistoryBackwardsKeepsForwardStack() async throws {
 		let root = await Self.historyRoot()
 		let current = try await root.lexicon["root.b"].try()
