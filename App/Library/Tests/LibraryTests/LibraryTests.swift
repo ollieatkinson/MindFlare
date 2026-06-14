@@ -3,6 +3,67 @@ import Lexicon
 @testable import Library
 
 final class LibraryTests: Hopes {
+
+	func testSnapshotEqualityUsesStructuralTaskPaperSemantics() throws {
+		func document(
+			date: TimeInterval,
+			imports: [String] = [],
+			connections: [String] = []
+		) -> Lexicon.Document {
+			Lexicon.Document(
+				date: Date(timeIntervalSince1970: date),
+				roots: [
+					"root": Lexicon.Graph.Node(
+						name: "root",
+						children: [
+							"child": Lexicon.Graph.Node(
+								name: "child",
+								connections: connections.map(Lexicon.Import.init)
+							),
+						]
+					),
+				],
+				imports: imports.map(Lexicon.Import.init)
+			)
+		}
+
+		let stableGraph = Lexicon.Graph(
+			root: Lexicon.Graph.Node(name: "root"),
+			date: Date(timeIntervalSince1970: 1)
+		)
+		let lhs = Document.Snapshot(
+			document: document(
+				date: 2,
+				imports: [
+					"./b.lexicon",
+					"./a.lexicon",
+				],
+				connections: [
+					"./z.lexicon",
+					"./a.lexicon",
+				]
+			),
+			composed: document(date: 3),
+			graph: stableGraph
+		)
+		let rhs = Document.Snapshot(
+			document: document(
+				date: 4,
+				imports: [
+					"./a.lexicon",
+					"./b.lexicon",
+				],
+				connections: [
+					"./a.lexicon",
+					"./z.lexicon",
+				]
+			),
+			composed: document(date: 5),
+			graph: stableGraph
+		)
+
+		XCTAssertEqual(lhs, rhs)
+	}
 	
 	func testConnectedLexiconCompositionResolvesLocalFileConnections() throws {
 		let directory = FileManager.default.temporaryDirectory

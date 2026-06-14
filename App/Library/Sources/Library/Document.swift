@@ -98,8 +98,44 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 			lhs.new == rhs.new &&
 			lhs.graph == rhs.graph &&
 			lhs.compositionDiagnostics == rhs.compositionDiagnostics &&
-			TaskPaper.encode(lhs.document) == TaskPaper.encode(rhs.document) &&
-			TaskPaper.encode(lhs.composed) == TaskPaper.encode(rhs.composed)
+			documentsEqual(lhs.document, rhs.document) &&
+			documentsEqual(lhs.composed, rhs.composed)
+		}
+
+		private static func documentsEqual(_ lhs: Lexicon.Document, _ rhs: Lexicon.Document) -> Bool {
+			lhs.comments == rhs.comments &&
+			lhs.notes == rhs.notes &&
+			importReferences(lhs.imports) == importReferences(rhs.imports) &&
+			nodesEqual(lhs.roots, rhs.roots)
+		}
+
+		private static func nodesEqual(
+			_ lhs: Lexicon.Document.Roots,
+			_ rhs: Lexicon.Document.Roots
+		) -> Bool {
+			let lhsKeys = Array(lhs.keys)
+			let rhsKeys = Array(rhs.keys)
+			guard lhsKeys == rhsKeys else {
+				return false
+			}
+			return zip(lhs.values, rhs.values).allSatisfy(nodesEqual)
+		}
+
+		private static func nodesEqual(_ lhs: Lexicon.Graph.Node, _ rhs: Lexicon.Graph.Node) -> Bool {
+			lhs.name == rhs.name &&
+			lhs.type == rhs.type &&
+			lhs.protonym == rhs.protonym &&
+			lhs.defaultValue == rhs.defaultValue &&
+			lhs.notes == rhs.notes &&
+			lhs.comments == rhs.comments &&
+			importReferences(lhs.connections) == importReferences(rhs.connections) &&
+			nodesEqual(lhs.children, rhs.children)
+		}
+
+		private static func importReferences(_ imports: [Lexicon.Import]) -> [String] {
+			imports
+				.map(\.reference)
+				.sorted()
 		}
 
 		func composing(relativeTo sourceURL: URL?) throws -> Self {
