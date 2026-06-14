@@ -33,7 +33,7 @@ struct Editor: View {
 			ColumnsView(columns: my.ui.columns)
 			PropertiesView(ui: my.ui.properties)
 		}
-		.cliEvents(for: my.doc.browser.cli)
+			.cliEvents(for: my.doc.browser.cli, while: { my.uiContext != .renaming })
 		.searchable(my.doc.editor.search, in: Binding(get: { my.cli.lemma.lexicon }, set: { _ in }))
 
 		.animation(animated ? .default : nil, value: my.cli)

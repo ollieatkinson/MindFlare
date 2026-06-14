@@ -19,7 +19,7 @@ public struct MindFlareApp: App {
 
 	@State var documentCount = 0
 
-	var bear: Mind = [] // TODO: @State and where to +=
+	private var bear: Mind = []
 
 	@Bear var mind: Mind {
 
@@ -77,10 +77,7 @@ public struct MindFlareApp: App {
 								return
 							}
 						}
-//						 launchCount = 0 // TODO: remove
 					}
-
-				let pb = NSPasteboard.general
 
 				Menu("New from Example") {
 
@@ -105,36 +102,33 @@ public struct MindFlareApp: App {
 				}
 
 				Button("New from Clipboard") {
-					guard
-						let string = pb
-							.string(forType: .string)?
-							.trimmingCharacters(in: .whitespacesAndNewlines),
-						let graph = try? TaskPaper(string).decode() // TODO: error handling
-					else {
-						return
+					do {
+						let string = try Self.pasteboardText()
+						Self.openNewDocument(graph: try TaskPaper(string).decode())
+					} catch {
+						Self.showNewDocumentError(error, title: "Could Not Read Clipboard")
 					}
-					Document.prepareNewDocument(graph: graph)
-					NSDocumentController.shared.newDocument(nil)
 				}
 				.keyboardShortcut("n", modifiers: [.shift, .command])
-				// .disabled(pb.string(forType: .string)?.isNotEmpty ?? false) // TODO: !
+				.disabled(!Self.hasPasteboardText)
 
 				Button("New Sentences from Clipboard") {
 					Task { @MainActor in
-						guard
-							let string = pb.string(forType: .string)
-						else {
-							return
+						do {
+							let string = try Self.pasteboardText()
+							Self.openNewDocument(graph: Lexicon.Graph.from(sentences: string, root: "a"))
+						} catch {
+							Self.showNewDocumentError(error, title: "Could Not Read Clipboard")
 						}
-						Document.prepareNewDocument(graph: Lexicon.Graph.from(sentences: string, root: "a"))
-						NSDocumentController.shared.newDocument(nil)
 					}
 				}
 				.keyboardShortcut("n", modifiers: [.shift, .option, .command])
-				// .disabled(pb.string(forType: .string)?.isNotEmpty ?? false) // TODO: !
+				.disabled(!Self.hasPasteboardText)
 			}
 
 			CommandGroup(after: .undoRedo) {
+				Divider()
+				Button(\.edit.cancel, events).keyboardShortcut(.escape, modifiers: [])
 				Divider()
 				Button(\.edit.commit, events).keyboardShortcut(.return, modifiers: [])
 				Button(\.edit.commit.and.enter, events).keyboardShortcut(.return, modifiers: [.shift])
@@ -152,16 +146,17 @@ public struct MindFlareApp: App {
 				Button(\.edit.paste.sentences, events).keyboardShortcut("v", modifiers: [.option, .command])
 			}
 
-			// TODO: ↓
-			// CommandGroup(after: .textEditing) {
-			//     if my.isRecording {
-			//         Button(\.edit.recording.stop, events)
-			//     } else if case .some = my.focused {
-			//         Button(\.edit.recording.start, events)
-			//     }
-			// }
-
-			// TODO: ⌘ F for Find
+			CommandGroup(after: .textEditing) {
+				Divider()
+				Button("Find") {
+					guard let focusedDocumentID else {
+						return
+					}
+					app.document[focusedDocumentID].editor.search.did.start >> events
+				}
+				.keyboardShortcut("f", modifiers: .command)
+				.disabled(focusedDocumentID == nil)
+			}
 
 			CommandGroup(replacing: .toolbar) {
 				Button(\.view.back, events).keyboardShortcut(.leftArrow, modifiers: .option)
@@ -179,14 +174,43 @@ public struct MindFlareApp: App {
 							app.menu.file.export[name] >> events
 						}
 					}
-					// TODO: ↓
-					// if my.hasRecord {
-					//     Divider()
-					//     Button(\.file.export.recording, events)
-					// }
 				}
 			}
 		}
+	}
+}
+
+private extension MindFlareApp {
+
+	static var hasPasteboardText: Bool {
+		(try? pasteboardText()) != nil
+	}
+
+	static func pasteboardText() throws -> String {
+		guard
+			let string = NSPasteboard.general
+				.string(forType: .string)?
+				.trimmingCharacters(in: .whitespacesAndNewlines),
+			!string.isEmpty
+		else {
+			throw CocoaError(.fileReadNoSuchFile)
+		}
+		return string
+	}
+
+	static func openNewDocument(graph: Lexicon.Graph) {
+		Document.prepareNewDocument(graph: graph)
+		NSDocumentController.shared.newDocument(nil)
+	}
+
+	static func showNewDocumentError(_ error: Error, title: String) {
+		let alert = NSAlert()
+		alert.messageText = title
+		alert.informativeText = error is CocoaError
+			? "The clipboard does not contain readable Lexicon text."
+			: error.localizedDescription
+		alert.alertStyle = .warning
+		alert.runModal()
 	}
 }
 

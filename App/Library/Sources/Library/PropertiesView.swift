@@ -71,9 +71,12 @@ struct Synonym: View {
 			isHoveringOverProtonym = $0
 		}
 		.onTapGesture {
-			// TODO: dedicated event ↓
-			app.document[id].browser.column.section.heading[protonym.id].event.tap >> events
+			open(protonym)
 		}
+	}
+
+	private func open(_ lemma: Lemma) {
+		app.document[id].browser.column.section.heading[lemma.id].event.tap >> events
 	}
 
 	var foreground: NSColor {
@@ -153,9 +156,12 @@ extension RelationshipList {
 				isHoveringOverInheritance = $0
 			}
 			.onTapGesture {
-				// TODO: dedicated event ↓
-				app.document[id].browser.column.section.heading[type.id].event.tap >> events
+				open(type)
 			}
+		}
+
+		private func open(_ lemma: Lemma) {
+			app.document[id].browser.column.section.heading[lemma.id].event.tap >> events
 		}
 
 		var foreground: NSColor {

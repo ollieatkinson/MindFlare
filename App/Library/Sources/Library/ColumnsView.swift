@@ -90,7 +90,7 @@ struct ColumnChildGroupView: View {
 				Text(ui.displayID)
 					.font(.caption2)
 					.foregroundColor(.secondary)
-					.padding(insets)
+					.padding(.columnSectionHeader(isFirst: ui.isFirst))
 					.onTapGesture {
 						app.document[id].browser.column.section.heading[type.id].event.tap >> events
 					}
@@ -105,14 +105,6 @@ struct ColumnChildGroupView: View {
 		.frame(maxWidth: .infinity)
 	}
 
-	var insets: EdgeInsets {
-		EdgeInsets(
-			top: ui.isFirst ? 3 : 12,
-			leading: 5,
-			bottom: 3,
-			trailing: 5
-		)
-	}
 }
 
 struct ColumnCell: View {
@@ -169,7 +161,7 @@ struct ColumnCell: View {
 				Image(systemName: "chevron.right").controlSize(.mini)
 			}
 		}
-		.padding(EdgeInsets(top: 2, leading: 5, bottom: 2, trailing: 5)) // TODO: unify styling across components
+		.padding(.columnCell)
 		.foregroundColor(textColor)
 		.background(backgroundColor)
 		.contentShape(Rectangle())
@@ -195,30 +187,27 @@ struct ColumnCell: View {
 			}
 		}
 
-		// TODO: refactor ↓
-
 		.popover(item: $browser) { browser in
-
-			let title = my.uiContext == .synonym
-			? "Become synonym of this lemma"
-			: "Inherit from this lemma"
-
-			Browser(commitTitle: title)
+			Browser(commitTitle: relationshipBrowserTitle)
 				.environmentObject(browser)
 				.as(app.document[id].browser.view)
 				.onDisappear {
 					my.uiContext = .viewing
 				}
 		}
-		.onChange(of: ui.isInheriting) { _, isPopping in
+		.onChange(of: ui.relationshipBrowserMode) { _, mode in
 			Task { @MainActor in
-				browser = isPopping ? await Browser.Object(parent: my) : nil
+				browser = mode == nil ? nil : await Browser.Object(parent: my)
 			}
 		}
-		.onChange(of: ui.isSearchingProtonym) { _, isPopping in
-			Task { @MainActor in
-				browser = isPopping ? await Browser.Object(parent: my) : nil
-			}
+	}
+
+	var relationshipBrowserTitle: String {
+		switch ui.relationshipBrowserMode {
+			case .synonym:
+				"Become synonym of this lemma"
+			case .inheritance, nil:
+				"Inherit from this lemma"
 		}
 	}
 
@@ -240,6 +229,35 @@ struct ColumnCell: View {
 			nsColor: ui.isIherited ? .unemphasizedSelectedTextBackgroundColor :
 					.selectedContentBackgroundColor.withAlphaComponent(ui.isSynonym ? 0.5 : 1)
 		)
+	}
+}
+
+private enum RelationshipBrowserMode: Equatable {
+	case inheritance
+	case synonym
+}
+
+private extension CLI.UI.Column.Row {
+
+	var relationshipBrowserMode: RelationshipBrowserMode? {
+		if isInheriting {
+			return .inheritance
+		}
+		if isSearchingProtonym {
+			return .synonym
+		}
+		return nil
+	}
+}
+
+private extension EdgeInsets {
+
+	static var columnCell: EdgeInsets {
+		EdgeInsets(top: 2, leading: 5, bottom: 2, trailing: 5)
+	}
+
+	static func columnSectionHeader(isFirst: Bool) -> EdgeInsets {
+		EdgeInsets(top: isFirst ? 3 : 12, leading: 5, bottom: 3, trailing: 5)
 	}
 }
 

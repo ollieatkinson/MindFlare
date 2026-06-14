@@ -21,24 +21,27 @@ struct Searchable<A: L & I_app_ui_search>: ViewModifier {
 	@State var query = ""
 	@State var submitted = ""
 
+	@FocusState private var isSearchFocused: Bool
+
 	let search: K<A>
 
 	@StateObject var my: LexiconSearchModel
 
 	func body(content: Content) -> some View {
 		content
-			.searchable(text: $query, prompt: Text(app.ui.search.prompt(\.localizedType))) {
-				ForEach(my.suggestions, id: \.self) { id in
+				.searchable(text: $query, prompt: Text(app.ui.search.prompt(\.localizedType))) {
+					ForEach(my.suggestions, id: \.self) { id in
 					Text(id.replacingOccurrences(of: ".", with: " "))
 						.preferredColorScheme(.dark)
 						.lineLimit(1)
 						.truncationMode(.head)
-						.searchCompletion(id)
+							.searchCompletion(id)
+					}
 				}
-			}
-			.onChange(of: query) { _, query in
-				guard query != submitted else {
-					return
+				.searchFocused($isSearchFocused)
+				.onChange(of: query) { _, query in
+					guard query != submitted else {
+						return
 				}
 				my.query = query
 				search.query[query].did.change >> events
@@ -48,11 +51,14 @@ struct Searchable<A: L & I_app_ui_search>: ViewModifier {
 					return
 				}
 				submitted = query
-				search.query[submitted].did.submit >> events
-				query = ""
-			}
-			.modifier(Child(search: search))
-	}
+					search.query[submitted].did.submit >> events
+					query = ""
+				}
+				.on(search.did.start) { _ in
+					isSearchFocused = true
+				}
+				.modifier(Child(search: search))
+		}
 
 	init(_ search: K<A>, in lexicon: Binding<Lexicon>) {
 		self.search = search

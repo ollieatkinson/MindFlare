@@ -193,4 +193,52 @@ final class LibraryTests: Hopes {
 		XCTAssertEqual(anchorConnections.map(\.lexicon), ["engineering.lexicon"])
 		XCTAssertEqual(descendantConnections.map(\.path), ["organization.engineering"])
 	}
+
+	func testHistoryBackwardsKeepsForwardStack() async throws {
+		let root = await Self.historyRoot()
+		let current = try await root.lexicon["root.b"].try()
+		let cli = await CLI(current)
+
+		let result = await Editor.Object.backwards(
+			cli: cli,
+			back: ["root", "root.a", "root.b"],
+			forward: ["root.c"]
+		)
+
+		XCTAssertEqual(result.cli?.lemma.id, "root.a")
+		XCTAssertEqual(result.back, ["root", "root.a"])
+		XCTAssertEqual(result.forward, ["root.c", "root.b"])
+	}
+
+	func testHistoryBackwardsPrunesDeletedNodes() async throws {
+		let root = await Self.historyRoot()
+		let current = try await root.lexicon["root.b"].try()
+		let cli = await CLI(current)
+
+		let result = await Editor.Object.backwards(
+			cli: cli,
+			back: ["root", "root.deleted", "root.b"],
+			forward: []
+		)
+
+		XCTAssertEqual(result.cli?.lemma.id, "root")
+		XCTAssertEqual(result.back, ["root"])
+		XCTAssertEqual(result.forward, ["root.b"])
+	}
+
+	@LexiconActor private static func historyRoot() -> Lemma {
+		Lexicon.from(
+			Lexicon.Graph(
+				root: Lexicon.Graph.Node(
+					name: "root",
+					children: [
+						"a": Lexicon.Graph.Node(name: "a"),
+						"b": Lexicon.Graph.Node(name: "b"),
+						"c": Lexicon.Graph.Node(name: "c"),
+					]
+				)
+			)
+		)
+		.root
+	}
 }

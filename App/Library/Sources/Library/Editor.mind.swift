@@ -13,7 +13,6 @@ extension Editor.Object {
 	var isBrowsing: Bool { uiContext == .inheriting }
 
 	var isFocused: Bool { focusedDocumentID == id }
-	var isInGraphNode: Bool { cli.lemma.isGraphNode }
 
 	var doc: K<L_app_document> { app.document[id] }
 	var browser: K<L_app_document_browser> { doc.browser }
@@ -29,7 +28,7 @@ extension Editor.Object {
 
 	@Bear var mindCLI: Mind {
 
-		browser.column.cell.event.tap >> then { my, event in // TODO: animate the scroll
+		browser.column.cell.event.tap >> then { my, event in
 			guard
 				let id: Lemma.ID = try? event[app.document.browser.column.cell, as: Lemma.ID.self],
 				let lemma = await my.cli.lemma.lexicon[id]
@@ -155,10 +154,24 @@ extension Editor.Object {
 
 		editor.cli.lemma.rename.to >> inFocus { my, event in
 			guard
-				let name: Lemma.Name = try? event[type: Lemma.Name.self],
-				let lemma = await my.cli.lemma.rename(to: name)
+				let name: Lemma.Name = try? event[type: Lemma.Name.self]
 			else {
-				return // TODO: log errors
+				my.presentIssue(
+					"Could Not Rename Lemma",
+					information: "MindFlare did not receive a valid replacement name."
+				)
+				return
+			}
+			if let failure = await my.cli.lemma.renameFailureDescription(to: name) {
+				my.presentIssue("Could Not Rename Lemma", information: failure)
+				return
+			}
+			guard let lemma = await my.cli.lemma.rename(to: name) else {
+				my.presentIssue(
+					"Could Not Rename Lemma",
+					information: "The Lexicon rejected the rename after validation. Reload the document and try again."
+				)
+				return
 			}
 			my.nextLemma = lemma
 		}
@@ -195,7 +208,7 @@ extension Editor.Object {
 
 		let pb = NSPasteboard.general
 
-		app.menu.edit.cancel >> inFocus { my, _ in // TODO: add Cancel to the View/Edit menu
+		app.menu.edit.cancel >> inFocus { my, _ in
 			my.uiContext = .viewing
 		}
 
@@ -233,12 +246,17 @@ extension Editor.Object {
 		}
 
 		app.menu.edit.cut >> then { my, event in
-			guard my.cli.lemma.isGraphNode else {
-				return // TODO: explain why to the user!
+			if let failure = await my.cli.lemma.graphEditFailureDescription(action: "cut") {
+				my.presentIssue("Could Not Cut Lemma", information: failure)
+				return
 			}
 			let string = await TaskPaper.encode(my.cli.lemma.graph)
 			guard let lemma = await my.cli.lemma.lexicon.delete(my.cli.lemma) else {
-				return // TODO: explain why to the user!
+				my.presentIssue(
+					"Could Not Cut Lemma",
+					information: "The root lemma cannot be cut. Rename it or move its children instead."
+				)
+				return
 			}
 			pb.clearContents()
 			pb.setString(string, forType: .string)
@@ -246,12 +264,8 @@ extension Editor.Object {
 		}
 
 		app.menu.edit.inherit >> then { my, event in
-			guard
-				// TODO: move this ↓ validation to Lemma
-				my.cli.lemma.isGraphNode, // TODO: explain why to the user!
-				my.cli.lemma.parent != nil,
-				await !my.cli.lemma.hasProtonym
-			else {
+			if let failure = await my.cli.lemma.relationshipEditFailureDescription(action: "inherit from another lemma") {
+				my.presentIssue("Could Not Add Inheritance", information: failure)
 				return
 			}
 			my.uiContext = .inheriting
@@ -297,18 +311,16 @@ extension Editor.Object {
 		}
 
 		app.menu.edit.rename >> then { my, event in
-			guard my.cli.lemma.isGraphNode else {
-				return // TODO: explain to the user
+			if let failure = await my.cli.lemma.graphEditFailureDescription(action: "rename") {
+				my.presentIssue("Could Not Rename Lemma", information: failure)
+				return
 			}
 			my.uiContext = .renaming
 		}
 
 		app.menu.edit.synonym >> then { my, event in
-			guard
-				my.cli.lemma.isGraphNode, // TODO: explain why to the user!
-				my.cli.lemma.parent != nil,
-				await !my.cli.lemma.hasProtonym
-			else {
+			if let failure = await my.cli.lemma.relationshipEditFailureDescription(action: "become a synonym") {
+				my.presentIssue("Could Not Create Synonym", information: failure)
 				return
 			}
 			my.uiContext = .synonym
@@ -338,5 +350,44 @@ extension Editor.Object {
 				my.cli = cli
 			}
 		}
+	}
+}
+
+private extension Lemma {
+
+	func graphEditFailureDescription(action: String) -> String? {
+		guard isGraphNode else {
+			return "\(displayName) is inherited from another Lexicon. Open the source Lexicon to \(action) it."
+		}
+		return nil
+	}
+
+	func relationshipEditFailureDescription(action: String) async -> String? {
+		if let failure = graphEditFailureDescription(action: action) {
+			return failure
+		}
+		guard parent != nil else {
+			return "The root lemma cannot \(action). Select one of its child lemmas instead."
+		}
+		guard !hasProtonym else {
+			return "\(displayName) is already a synonym. Remove the synonym relationship before changing inheritance."
+		}
+		return nil
+	}
+
+	func renameFailureDescription(to name: Lemma.Name) async -> String? {
+		if let failure = graphEditFailureDescription(action: "rename") {
+			return failure
+		}
+		guard Lemma.isValid(name: name) else {
+			return "\"\(name)\" is not a valid Lexicon name. Names must start with a letter and contain only letters, digits, or single underscores."
+		}
+		guard self.name != name else {
+			return "\(displayName) already has that name."
+		}
+		guard parent?.children[name] == nil else {
+			return "A sibling named \(name) already exists under \(parent?.displayName ?? "the parent lemma")."
+		}
+		return nil
 	}
 }

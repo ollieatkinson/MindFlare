@@ -6,8 +6,6 @@ import SwiftUI
 import Lexicon
 import UniformTypeIdentifiers
 
-// TODO: enable dictation!
-
 extension View {
 
 	func cliEvents<A: L & I_app_ui_cli>(
@@ -31,52 +29,72 @@ extension CLI {
 
 		func body(content: Content) -> some View {
 
-			content.onReceive(NSWindow.keyDown) { event in
+			content
+				.onReceive(NSWindow.keyDown) { event in
 
-				guard
-					event.windowNumber == windowNumber,
-					!isSearching,
-					isEnabled()
-				else {
-					return
+					guard
+						event.windowNumber == windowNumber,
+						!isSearching,
+						isEnabled()
+					else {
+						return
+					}
+
+					if event.keyCode == .escKey {
+						events.send(Event(app.menu.edit.cancel))
+						return
+					}
+
+					switch (event.specialKey, event.characters.map(String.init(_:))) {
+
+						case (_, "\r"):
+							break
+
+						case (.delete?, _), (.leftArrow?, _):
+							if event.modifierFlags.contains(.command) {
+								events.send(Event(cli.reset))
+							} else {
+								events.send(Event(cli.backspace))
+							}
+
+						case (.tab?, _), (.rightArrow?, _), (_, " "), (_, "."):
+							events.send(Event(cli.enter))
+
+						case (.upArrow?, _):
+							events.send(Event(cli.select.previous))
+
+						case (.downArrow?, _):
+							events.send(Event(cli.select.next))
+
+						case (_, let c?)
+							where event.modifierFlags.isDisjoint(with: [.control, .option, .command])
+							&& c.count == 1:
+
+							events.send(Event(cli.append[String(c.first!)]))
+
+						default:
+							break
+					}
 				}
+				.onReceive(NSResponder.insertedText) { input in
 
-				if event.keyCode == .escKey {
-					events.send(Event(app.menu.edit.cancel))
-					return
-				}
+					guard
+						input.windowNumber == windowNumber,
+						!isSearching,
+						isEnabled()
+					else {
+						return
+					}
 
-				switch (event.specialKey, event.characters.map(String.init(_:))) {
-
-					case (_, "\r"):
-						break
-
-					case (.delete?, _), (.leftArrow?, _):
-						if event.modifierFlags.contains(.command) {
-							events.send(Event(cli.reset))
-						} else {
-							events.send(Event(cli.backspace))
+					for character in input.string {
+						switch character {
+							case "\r", "\n", "\t", " ", ".":
+								events.send(Event(cli.enter))
+							default:
+								events.send(Event(cli.append[String(character)]))
 						}
-
-					case (.tab?, _), (.rightArrow?, _), (_, " "), (_, "."):
-						events.send(Event(cli.enter))
-
-					case (.upArrow?, _):
-						events.send(Event(cli.select.previous))
-
-					case (.downArrow?, _):
-						events.send(Event(cli.select.next))
-
-					case (_, let c?)
-						where event.modifierFlags.isDisjoint(with: [.control, .option, .command])
-						&& c.count == 1:
-
-						events.send(Event(cli.append[String(c.first!)]))
-
-					default:
-						break
+					}
 				}
-			}
 		}
 	}
 }

@@ -7,8 +7,6 @@ import Lexicon
 
 extension Browser.Object {
 
-	// TODO: refactor with Editor.Object ↓
-
 	var doc: K<L_app_document> { app.document[id] }
 
 	@Bear var mind: Mind {
@@ -54,7 +52,7 @@ extension Browser.Object {
 
 		doc.browser.cli.did.change >> then { my, event in
 
-			my.ui = await my.cli.ui( // TODO: refactor
+			my.ui = await my.cli.ui(
 				parent: my.parentCLI,
 				canCommit: my.uiContext == .synonym
 				? my.parentCLI.lemma.isValid(protonym: my.cli.lemma)
@@ -91,7 +89,7 @@ extension Browser.Object {
 			my.cli = await my.cli.entered()
 		}
 
-		doc.browser.cli.reset >> then { my, event in // TODO: esc also closes the popover :(
+		doc.browser.cli.reset >> then { my, event in
 			my.cli = await my.cli.reseting()
 		}
 
@@ -161,28 +159,21 @@ extension Browser.Object {
 	@Bear var mindViewMenu: Mind {
 
 		app.menu.view.back >> then { my, event in
-			guard
-				let currentID = my.back.last
-			else {
-				return
+			let (cli, back, forward) = await Editor.Object.backwards(cli: my.cli, back: my.back, forward: my.forward)
+			my.back = back
+			my.forward = forward
+			if let cli {
+				my.cli = cli
 			}
-			my.forward.append(currentID)
-			my.back = my.back.dropLast()
-			guard let id = my.back.last else { return }
-			guard let lemma = await my.cli.lemma.lexicon[id] else { return } // TODO: handle renaming and deleting
-			my.cli = await my.cli.reseting(to: lemma)
 		}
 
 		app.menu.view.forward >> then { my, event in
-			guard
-				let id = my.forward.last
-			else {
-				return
+			let (cli, back, forward) = await Editor.Object.forwards(cli: my.cli, back: my.back, forward: my.forward)
+			my.back = back
+			my.forward = forward
+			if let cli {
+				my.cli = cli
 			}
-			my.forward = my.forward.dropLast()
-			my.back.append(id)
-			guard let lemma = await my.cli.lemma.lexicon[id] else { return }
-			my.cli = await my.cli.reseting(to: lemma)
 		}
 	}
 }

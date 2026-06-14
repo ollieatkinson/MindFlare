@@ -138,6 +138,7 @@ extension CLI {
 
 		let breadcrumbs = breadcrumbs
 		let root = breadcrumbs[0]
+		var displayIDByTypeID = [Lemma.ID: String]()
 
 		let rootColumn = UI.Column(
 			id: "/",
@@ -185,9 +186,15 @@ extension CLI {
 				.filter(\.children.isEmpty.not)
 				.enumerated()
 				.map { i, group in
-					UI.Column.Section(
+					let displayID = displayIDByTypeID[group.type.id] ?? {
+						let displayID = group.type.lineage.reversed().map(\.displayName).joined(separator: " ")
+						displayIDByTypeID[group.type.id] = displayID
+						return displayID
+					}()
+
+					return UI.Column.Section(
 						id: group.type.id,
-						displayID: group.type.lineage.reversed().map(\.displayName).joined(separator: " "), // TODO: performance?
+						displayID: displayID,
 						type: group.type != lemma ? group.type : nil,
 						isFirst: i == 0,
 						rows: group.children.map { child in
@@ -213,7 +220,6 @@ extension CLI {
 						}
 					)
 				}
-
 
 			return UI.Column(
 				id: lemma.id,

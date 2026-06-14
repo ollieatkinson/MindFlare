@@ -38,7 +38,6 @@ extension Editor {
 		lazy var inFocus = mainContext { my in my.isFocused }
 		lazy var inBrowser = mainContext { my in my.isBrowsing }
 		lazy var inRenaming = mainContext { my in my.isRenaming }
-		lazy var inGraphNode = mainContext { my in my.isFocused && my.isInGraphNode } // TODO: use
 
 		var nextLemma: Lemma? {
 			didSet {
@@ -132,6 +131,14 @@ extension Editor {
 
 		deinit {
 			print("🗑 editor", cli.description, id)
+		}
+
+		func presentIssue(_ message: String, information: String) {
+			let alert = NSAlert()
+			alert.messageText = message
+			alert.informativeText = information
+			alert.alertStyle = .informational
+			alert.runModal()
 		}
 
 		func revert(to snapshot: Document.Snapshot) {
@@ -250,7 +257,7 @@ extension Editor.Object {
 	@LexiconActor static func backwards(cli: CLI, back: [Lemma.ID], forward: [Lemma.ID]) async -> (cli: CLI?, back: [Lemma.ID], forward: [Lemma.ID]) {
 		let (lemma, back, forward) = backwards(lemma: cli.lemma, back: back, forward: forward)
 		if let lemma = lemma {
-			return (CLI.with(lemma: lemma), back, [])
+			return (CLI.with(lemma: lemma), back, forward)
 		}
 		return (nil, back, forward)
 	}
@@ -258,7 +265,7 @@ extension Editor.Object {
 	@LexiconActor static func forwards(cli: CLI, back: [Lemma.ID], forward: [Lemma.ID]) async -> (cli: CLI?, back: [Lemma.ID], forward: [Lemma.ID]) {
 		let (lemma, back, forward) = forwards(lemma: cli.lemma, back: back, forward: forward)
 		if let lemma = lemma {
-			return (CLI.with(lemma: lemma), back, [])
+			return (CLI.with(lemma: lemma), back, forward)
 		}
 		return (nil, back, forward)
 	}
