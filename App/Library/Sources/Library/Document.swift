@@ -82,7 +82,8 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 				return self
 			}
 			let baseURL = sourceURL.deletingLastPathComponent()
-			return try Self.withSecurityScopedAccess(to: [sourceURL, baseURL]) {
+			let storedScopes = SecurityScopedImportAccess.storedScopeURLs(containing: baseURL)
+			return try SecurityScopedImportAccess.withAccess(to: [sourceURL, baseURL] + storedScopes) {
 				let resolver = SecurityScopedLexiconImportResolver(baseURL: baseURL)
 				let plan = try document.composed(resolving: resolver)
 				return try Self(
@@ -97,6 +98,9 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 		}
 
 		static func compositionFailureDescription(_ error: Error, sourceURL: URL?) -> String {
+			if let request = error as? SecurityScopedImportAccess.Request {
+				return request.diagnosticDescription(sourceURL: sourceURL)
+			}
 			if let sourceURL {
 				return "Could not compose Lexicon imports for \(sourceURL.lastPathComponent): \(error.localizedDescription). Check that imported files are readable and use paths relative to \(sourceURL.deletingLastPathComponent().path)."
 			}
@@ -109,7 +113,7 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 				switch conflict.kind {
 					case .importResolution:
 						if conflict.incoming == Lexicon.Import.Location.local.rawValue {
-							return "Could not resolve local Lexicon import for \(conflict.path). MindFlare looks for relative imports under \(basePath). Check that the referenced .lexicon file exists there and that macOS granted folder access."
+							return "Could not resolve local Lexicon import for \(conflict.path). MindFlare resolves local imports relative to \(basePath). Check that the referenced .lexicon file exists and that macOS granted access to its containing folder."
 						}
 						return "Could not resolve remote Lexicon import \(conflict.path). Remote imports are disabled for document composition."
 					case .defaultValue:
@@ -120,16 +124,6 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 						return "Conflicting inheritance at \(conflict.path): \(conflict.existing) and \(conflict.incoming). Choose one parent term or split the local vocabulary into a separate branch."
 				}
 			}
-		}
-
-		private static func withSecurityScopedAccess<Result>(to urls: [URL], _ body: () throws -> Result) rethrows -> Result {
-			let accessed = urls.filter { $0.startAccessingSecurityScopedResource() }
-			defer {
-				for url in accessed.reversed() {
-					url.stopAccessingSecurityScopedResource()
-				}
-			}
-			return try body()
 		}
 
 		func sourceDocument(updatingTo composed: Lexicon.Document, graph: Lexicon.Graph) -> Lexicon.Document {
@@ -266,24 +260,32 @@ private struct SecurityScopedLexiconImportResolver: LexiconImportResolving {
 				url = remote
 		}
 
-		let accessed = url.startAccessingSecurityScopedResource()
-		defer {
-			if accessed {
-				url.stopAccessingSecurityScopedResource()
+		do {
+			return try SecurityScopedImportAccess.withAccess(to: [url] + SecurityScopedImportAccess.storedScopeURLs(containing: url)) {
+				try TaskPaper(Data(contentsOf: url)).decodeDocument()
 			}
+		} catch {
+			if let request = SecurityScopedImportAccess.requestIfNeeded(for: error, fileURL: url, import: `import`) {
+				throw request
+			}
+			throw error
 		}
-		return try TaskPaper(Data(contentsOf: url)).decodeDocument()
 	}
 
 	private func localURL(for reference: String) -> URL? {
+		guard
+			!reference.isEmpty,
+			!reference.hasPrefix("/"),
+			URLComponents(string: reference)?.scheme == nil
+		else {
+			return nil
+		}
+
 		let base = baseURL.standardizedFileURL.resolvingSymlinksInPath()
 		let candidate = URL(fileURLWithPath: reference, relativeTo: base)
 			.standardizedFileURL
 			.resolvingSymlinksInPath()
 		guard candidate.isFileURL else {
-			return nil
-		}
-		guard candidate.path == base.path || candidate.path.hasPrefix(base.path + "/") else {
 			return nil
 		}
 		return candidate

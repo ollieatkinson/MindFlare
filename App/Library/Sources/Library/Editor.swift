@@ -23,7 +23,12 @@ struct Editor: View {
     var body: some View {
         
         VStack(alignment: .leading, spacing: 8) {
-			CompositionDiagnosticsView(diagnostics: my.snapshot.compositionDiagnostics)
+			CompositionDiagnosticsView(
+				diagnostics: my.snapshot.compositionDiagnostics,
+				grantFolderAccess: my.pendingImportAccessRequest == nil && my.fileURL == nil ? nil : {
+					my.grantImportFolderAccess()
+				}
+			)
             CLIView(text: my.ui.text)
             ColumnsView(columns: my.ui.columns)
             PropertiesView(ui: my.ui.properties)
@@ -67,6 +72,7 @@ struct Editor: View {
 struct CompositionDiagnosticsView: View {
 
 	let diagnostics: [String]
+	let grantFolderAccess: (() -> Void)?
 
 	var body: some View {
 		if !diagnostics.isEmpty {
@@ -87,6 +93,16 @@ struct CompositionDiagnosticsView: View {
 					Text("\(diagnostics.count - 1) more issue\(diagnostics.count == 2 ? "" : "s")")
 						.foregroundStyle(.secondary)
 				}
+
+				if let grantFolderAccess {
+					Button {
+						grantFolderAccess()
+					} label: {
+						Label("Grant Folder Access", systemImage: "folder.badge.gearshape")
+					}
+					.buttonStyle(.borderless)
+					.help("Allow MindFlare to read imported Lexicon files")
+				}
 			}
 			.font(.caption)
 			.frame(maxWidth: .infinity, alignment: .leading)
@@ -98,9 +114,9 @@ struct CompositionDiagnosticsView: View {
 #if DEBUG
 #Preview("Composition diagnostics") {
 	CompositionDiagnosticsView(diagnostics: [
-		"Could not resolve local Lexicon import for organization.products. MindFlare looks for relative imports under /Users/example/Vocabulary. Check that the referenced .lexicon file exists there and that macOS granted folder access.",
+		"Could not resolve local Lexicon import for organization.products. MindFlare resolves local imports relative to /Users/example/Vocabulary. Check that the referenced .lexicon file exists and that macOS granted access to its containing folder.",
 		"Conflicting default values at app.document.editor: true and false. Move the shared value into one imported lexicon or make the local override explicit.",
-	])
+	], grantFolderAccess: {})
 	.padding()
 	.frame(width: 520, alignment: .leading)
 }

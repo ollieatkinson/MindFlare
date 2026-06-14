@@ -23,6 +23,7 @@ extension Editor {
 		
 		@Published var ui: CLI.UI.Editor
 		@Published var snapshot: Document.Snapshot
+		@Published var pendingImportAccessRequest: SecurityScopedImportAccess.Request?
 
 		let id: UInt
 		let description: String
@@ -109,8 +110,14 @@ extension Editor {
 			
 			self.document = document
             
-			let snapshot = Self.composedSnapshot(for: document.snapshot, fileURL: fileURL)
+			let composition = Self.composedSnapshot(
+				for: document.snapshot,
+				fileURL: fileURL,
+				requestingAccess: true
+			)
+			let snapshot = composition.snapshot
 			self.snapshot = snapshot
+			self.pendingImportAccessRequest = composition.pendingImportAccessRequest
 
 			var lemma = await Self.root(for: snapshot)
 			if let id = snapshot.new, let o = await lemma.lexicon[id] {
@@ -128,7 +135,43 @@ extension Editor {
 		}
 		
 		func revert(to snapshot: Document.Snapshot) {
-			let snapshot = Self.composedSnapshot(for: snapshot, fileURL: fileURL)
+			let composition = Self.composedSnapshot(
+				for: snapshot,
+				fileURL: fileURL,
+				requestingAccess: pendingImportAccessRequest == nil
+			)
+			pendingImportAccessRequest = composition.pendingImportAccessRequest
+			apply(composition.snapshot)
+        }
+
+		func grantImportFolderAccess() {
+			guard let fileURL else {
+				return
+			}
+
+			let granted: Bool
+			if let request = pendingImportAccessRequest {
+				granted = SecurityScopedImportAccess.requestAccess(for: request)
+			} else {
+				granted = SecurityScopedImportAccess.requestFolderAccess(
+					defaultingTo: fileURL.deletingLastPathComponent()
+				)
+			}
+			guard granted else {
+				return
+			}
+
+			let composition = Self.composedSnapshot(
+				for: document.snapshot,
+				fileURL: fileURL,
+				requestingAccess: true
+			)
+			pendingImportAccessRequest = composition.pendingImportAccessRequest
+			apply(composition.snapshot)
+		}
+
+		private func apply(_ snapshot: Document.Snapshot) {
+			self.snapshot = snapshot
 			Task { @LexiconActor [cli, back, forward, snapshot] in
 				guard cli.lemma.lexicon.graph != snapshot.graph else {
 					return
@@ -156,14 +199,48 @@ extension Editor {
 
 extension Editor.Object {
 
-	nonisolated private static func composedSnapshot(for snapshot: Document.Snapshot, fileURL: URL?) -> Document.Snapshot {
-		do {
-			return try snapshot.composing(relativeTo: fileURL)
-		} catch {
-			var snapshot = snapshot
-			snapshot.compositionDiagnostics = [Document.Snapshot.compositionFailureDescription(error, sourceURL: fileURL)]
-			return snapshot
+	private struct Composition {
+		var snapshot: Document.Snapshot
+		var pendingImportAccessRequest: SecurityScopedImportAccess.Request?
+	}
+
+	@MainActor
+	private static func composedSnapshot(
+		for snapshot: Document.Snapshot,
+		fileURL: URL?,
+		requestingAccess: Bool
+	) -> Composition {
+		var pendingImportAccessRequest: SecurityScopedImportAccess.Request?
+
+		for _ in 0..<8 {
+			do {
+				return Composition(
+					snapshot: try snapshot.composing(relativeTo: fileURL),
+					pendingImportAccessRequest: nil
+				)
+			} catch let request as SecurityScopedImportAccess.Request {
+				pendingImportAccessRequest = request
+				guard requestingAccess, SecurityScopedImportAccess.requestAccess(for: request) else {
+					return Composition(
+						snapshot: snapshot.failedComposition(error: request, sourceURL: fileURL),
+						pendingImportAccessRequest: pendingImportAccessRequest
+					)
+				}
+			} catch {
+				return Composition(
+					snapshot: snapshot.failedComposition(error: error, sourceURL: fileURL),
+					pendingImportAccessRequest: pendingImportAccessRequest
+				)
+			}
 		}
+
+		return Composition(
+			snapshot: snapshot.failedComposition(
+				error: pendingImportAccessRequest ?? CocoaError(.fileReadNoPermission),
+				sourceURL: fileURL
+			),
+			pendingImportAccessRequest: pendingImportAccessRequest
+		)
 	}
 
 	@LexiconActor private static func root(for snapshot: Document.Snapshot) -> Lemma {
@@ -216,5 +293,16 @@ extension Editor.Object {
 			return (lemma, back, forward)
 		}
 		return (nil, back, [])
+	}
+}
+
+private extension Document.Snapshot {
+
+	func failedComposition(error: Error, sourceURL: URL?) -> Self {
+		var snapshot = self
+		snapshot.compositionDiagnostics = [
+			Self.compositionFailureDescription(error, sourceURL: sourceURL),
+		]
+		return snapshot
 	}
 }
