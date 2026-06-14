@@ -16,3 +16,13 @@ struct CLIView: View {
             .animation(.none, value: text)
     }
 }
+
+#if DEBUG
+#Preview("CLI breadcrumb") {
+	MindFlarePreviewLoader { fixture in
+		CLIView(text: fixture.editorUI.text)
+			.padding()
+			.frame(width: 420, alignment: .leading)
+	}
+}
+#endif

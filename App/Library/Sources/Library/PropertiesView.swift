@@ -181,3 +181,23 @@ extension PropertiesView {
         }
     }
 }
+
+#if DEBUG
+#Preview("Inheritance") {
+	MindFlarePreviewLoader { fixture in
+		InheritanceList(ui: fixture.editorUI.properties)
+			.environment(\.documentID, fixture.editor.id)
+			.frame(width: 360)
+			.padding()
+	}
+}
+
+#Preview("Synonym") {
+	MindFlarePreviewLoader { fixture in
+		Synonym(protonym: fixture.protonym, synonym: fixture.synonym)
+			.environment(\.documentID, fixture.editor.id)
+			.frame(width: 360)
+			.padding()
+	}
+}
+#endif

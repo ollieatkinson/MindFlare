@@ -41,3 +41,13 @@ struct Browser: View {
         )
     }
 }
+
+#if DEBUG
+#Preview("Browser chooser") {
+	MindFlarePreviewLoader { fixture in
+		Browser(commitTitle: "Inherit from this lemma")
+			.environmentObject(fixture.browser)
+			.frame(width: 520, height: 300)
+	}
+}
+#endif

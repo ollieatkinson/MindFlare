@@ -80,3 +80,14 @@ struct CompositionDiagnosticsView: View {
 		}
 	}
 }
+
+#if DEBUG
+#Preview("Composition diagnostics") {
+	CompositionDiagnosticsView(diagnostics: [
+		"importResolution conflict at ./shared.lexicon: unresolved <> local",
+		"defaultValue conflict at app.document.editor: true <> false",
+	])
+	.padding()
+	.frame(width: 420, alignment: .leading)
+}
+#endif

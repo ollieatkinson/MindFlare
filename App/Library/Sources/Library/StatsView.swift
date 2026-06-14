@@ -79,3 +79,12 @@ struct StatsView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("Stats") {
+	MindFlarePreviewLoader { fixture in
+		StatsView()
+			.environmentObject(fixture.editor)
+	}
+}
+#endif

@@ -252,3 +252,25 @@ private extension Button where Label == Text {
         }
     }
 }
+
+#if DEBUG
+#Preview("Columns") {
+	MindFlarePreviewLoader { fixture in
+		ColumnsView(columns: fixture.editorUI.columns)
+			.environmentObject(fixture.editor)
+			.environment(\.documentID, fixture.editor.id)
+			.frame(width: 520, height: 260)
+			.padding()
+	}
+}
+
+#Preview("Renaming row") {
+	MindFlarePreviewLoader { fixture in
+		ColumnsView(columns: fixture.renamingUI.columns)
+			.environmentObject(fixture.editor)
+			.environment(\.documentID, fixture.editor.id)
+			.frame(width: 360, height: 160)
+			.padding()
+	}
+}
+#endif
