@@ -187,21 +187,22 @@ extension RelationshipList {
 				Image(systemName: "point.3.connected.trianglepath.dotted")
 					.foregroundColor(Color(nsColor: .secondaryLabelColor))
 
-				VStack(alignment: .leading, spacing: 1) {
-					Text(inheritanceDescription)
-						.lineLimit(1)
-
-					Text(connection.lexicon)
-						.font(.caption2)
-						.foregroundColor(Color(nsColor: .secondaryLabelColor))
-						.lineLimit(1)
-				}
+				Text(inheritanceDescription)
+					.lineLimit(1)
+					.truncationMode(.middle)
 
 				Spacer()
 
-				Text(connection.import.location.rawValue.capitalized)
-					.font(.caption2)
-					.foregroundColor(Color(nsColor: .secondaryLabelColor))
+				HStack(spacing: 4) {
+					Image(systemName: connection.import.location.symbol)
+						.imageScale(.small)
+					Text(connection.import.reference)
+						.lineLimit(1)
+						.truncationMode(.middle)
+				}
+				.font(.caption2.weight(.semibold))
+				.foregroundColor(Color(nsColor: .secondaryLabelColor))
+				.frame(maxWidth: 260, alignment: .trailing)
 			}
 			.propertyListRow()
 			.foregroundColor(Color(nsColor: .textColor))
@@ -218,6 +219,18 @@ extension RelationshipList {
 				return connection.path
 			}
 			return "\(connection.path) / \(String(selectedPath.dropFirst(connection.path.count + 1)))"
+		}
+	}
+}
+
+private extension Lexicon.Import.Location {
+
+	var symbol: String {
+		switch self {
+			case .local:
+				return "doc"
+			case .remote:
+				return "globe"
 		}
 	}
 }
@@ -249,6 +262,10 @@ extension PropertiesView {
 		)
 		RelationshipList.ConnectionCell(
 			connection: .init(path: "commerce.api.storefront", import: .init("./storefront-api.lexicon")),
+			selectedPath: "commerce.api.storefront.order"
+		)
+		RelationshipList.ConnectionCell(
+			connection: .init(path: "commerce.api.storefront.order", import: .init("https://example.com/commerce/order.lexicon")),
 			selectedPath: "commerce.api.storefront.order"
 		)
 	}
