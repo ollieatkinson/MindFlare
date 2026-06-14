@@ -39,7 +39,11 @@ let package = Package(
 		),
 		.testTarget(
 			name: "LibraryTests",
-			dependencies: ["Hope", "Library"]
+			dependencies: [
+				"Hope",
+				"Library",
+				.product(name: "Lexicon", package: "Lexicon"),
+			]
 		),
 	]
 )

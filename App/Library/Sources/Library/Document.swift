@@ -81,16 +81,29 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 			guard let sourceURL else {
 				return self
 			}
-			let resolver = FileLexiconImportResolver(baseURL: sourceURL.deletingLastPathComponent())
-			let plan = try document.composed(resolving: resolver)
-			return try Self(
-				old: old,
-				new: new,
-				document: document,
-				composed: plan.document,
-				graph: plan.document.graph(root: graph.root.name),
-				compositionDiagnostics: plan.conflicts.map(\.description)
-			)
+			let baseURL = sourceURL.deletingLastPathComponent()
+			return try Self.withSecurityScopedAccess(to: [sourceURL, baseURL]) {
+				let resolver = SecurityScopedLexiconImportResolver(baseURL: baseURL)
+				let plan = try document.composed(resolving: resolver)
+				return try Self(
+					old: old,
+					new: new,
+					document: document,
+					composed: plan.document,
+					graph: plan.document.graph(root: graph.root.name),
+					compositionDiagnostics: plan.conflicts.map(\.description)
+				)
+			}
+		}
+
+		private static func withSecurityScopedAccess<Result>(to urls: [URL], _ body: () throws -> Result) rethrows -> Result {
+			let accessed = urls.filter { $0.startAccessingSecurityScopedResource() }
+			defer {
+				for url in accessed.reversed() {
+					url.stopAccessingSecurityScopedResource()
+				}
+			}
+			return try body()
 		}
 
 		func sourceDocument(updatingTo composed: Lexicon.Document, graph: Lexicon.Graph) -> Lexicon.Document {
@@ -200,4 +213,53 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
         
         return FileWrapper(regularFileWithContents: data)
     }
+}
+
+private struct SecurityScopedLexiconImportResolver: LexiconImportResolving {
+
+	let baseURL: URL
+	let allowRemote = false
+
+	func resolve(_ import: Lexicon.Import) throws -> Lexicon.Document? {
+		let url: URL
+		switch `import`.location {
+			case .local:
+				guard let local = localURL(for: `import`.reference) else {
+					return nil
+				}
+				url = local
+			case .remote:
+				guard
+					allowRemote,
+					let remote = URL(string: `import`.reference),
+					let scheme = remote.scheme?.lowercased(),
+					["http", "https"].contains(scheme)
+				else {
+					return nil
+				}
+				url = remote
+		}
+
+		let accessed = url.startAccessingSecurityScopedResource()
+		defer {
+			if accessed {
+				url.stopAccessingSecurityScopedResource()
+			}
+		}
+		return try TaskPaper(Data(contentsOf: url)).decodeDocument()
+	}
+
+	private func localURL(for reference: String) -> URL? {
+		let base = baseURL.standardizedFileURL.resolvingSymlinksInPath()
+		let candidate = URL(fileURLWithPath: reference, relativeTo: base)
+			.standardizedFileURL
+			.resolvingSymlinksInPath()
+		guard candidate.isFileURL else {
+			return nil
+		}
+		guard candidate.path == base.path || candidate.path.hasPrefix(base.path + "/") else {
+			return nil
+		}
+		return candidate
+	}
 }
