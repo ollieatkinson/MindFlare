@@ -80,97 +80,122 @@ static float flameLobe(
 	float lobeWeight = profile4.y;
 
 	float scale = max(min(size.x, size.y), 1.0);
-	float2 uv = (position - size * float2(0.5, 0.54)) / scale;
-	uv.x -= (horizontalBias - 0.5) * 0.04;
+	float2 uv = (position - size * float2(0.5, 0.55)) / scale;
 
-	float pulse = sin(time * (0.82 + motionSeed * 0.5) + seed * M_PI_F * 2.0) * 0.5 + 0.5;
-	float sway = sin(time * (0.46 + motionSeed * 0.38) + seed * M_PI_F * 2.0);
-	float breath = sin(time * (0.9 + shapeSeed * 0.46) + depthWeight * M_PI_F);
-	float fold = sin(time * (0.68 + foldSeed * 0.42) + inheritanceWeight * 5.2);
+	float pulse = sin(time * (0.66 + motionSeed * 0.28) + seed * M_PI_F * 2.0) * 0.5 + 0.5;
+	float sway = sin(time * (0.42 + motionSeed * 0.24) + seed * M_PI_F * 2.0);
+	float breath = sin(time * (0.72 + shapeSeed * 0.34) + depthWeight * M_PI_F);
+	float fold = sin(time * (0.52 + foldSeed * 0.28) + inheritanceWeight * 4.4);
+	float lexiconLean = (horizontalBias - 0.5) * 0.07 + sway * (0.012 + connectionWeight * 0.018);
 
-	float2 base = float2((horizontalBias - 0.5) * 0.05 + sway * (0.01 + connectionWeight * 0.015), 0.25);
-	float height = 0.46 + depthWeight * 0.12 + nodeWeight * 0.04 + breath * 0.018;
-	float width = 0.145 + branchWeight * 0.105 + leafWeight * 0.035;
-	float centerLean = (horizontalBias - 0.5) * 0.08 + sway * (0.018 + connectionWeight * 0.03);
+	float2 base = float2(lexiconLean * 0.18, 0.25);
+	float height = 0.56 + depthWeight * 0.1 + nodeWeight * 0.035 + breath * 0.012;
+	float width = 0.135 + branchWeight * 0.065 + leafWeight * 0.025;
+	float warmHue = mix(0.052 + paletteSeed * 0.04 + rhythmWeight * 0.015, primaryHue, 0.1);
+	float roseHue = mix(0.915 + paletteSeed * 0.035 + metadataWeight * 0.018, accentHue, 0.08);
+	float violetHue = 0.71 + foldSeed * 0.065 + connectionWeight * 0.03;
+	float coreHueResolved = mix(0.095 + shapeSeed * 0.035, coreHue, 0.1);
+	float split = 0.72 + lobeWeight * 0.1;
 
-	float plate = ellipseGlow(uv, float2(base.x + centerLean * 0.2, base.y + 0.005), float2(0.16 + branchWeight * 0.07, 0.026 + connectionWeight * 0.018));
-	float aura = ellipseGlow(uv, float2(base.x + centerLean * 0.08, 0.02), float2(0.23 + nodeWeight * 0.06, 0.29 + depthWeight * 0.08));
+	float plate = ellipseGlow(
+		uv,
+		float2(base.x + lexiconLean * 0.12, base.y + 0.01),
+		float2(0.15 + branchWeight * 0.05, 0.024 + connectionWeight * 0.015)
+	);
+	float aura = ellipseGlow(
+		uv,
+		float2(base.x + lexiconLean * 0.2, -0.01),
+		float2(0.22 + nodeWeight * 0.055, 0.31 + depthWeight * 0.075)
+	);
 
 	float3 color = float3(0.0);
-	color += flareHSV(primaryHue, 0.82, 1.0) * plate * (0.25 + pulse * 0.08);
-	color += flareHSV(accentHue, 0.58 + metadataWeight * 0.16, 1.0) * aura * (0.045 + metadataWeight * 0.06);
+	color += flareHSV(warmHue, 0.8, 1.0) * plate * (0.28 + pulse * 0.08);
+	color += flareHSV(roseHue, 0.45 + metadataWeight * 0.12, 1.0) * aura * (0.055 + metadataWeight * 0.035);
 
-	float bloom = flameLobe(
+	float leftOuter = flameLobe(
 		uv,
-		float2(base.x + centerLean * 0.18, base.y),
-		height * (0.3 + metadataWeight * 0.1),
-		width * (0.7 + branchWeight * 0.24),
-		centerLean * 0.45,
-		fold * 0.035,
-		0.5,
-		time + paletteSeed * 8.0
+		float2(base.x - width * 0.28, base.y - 0.005),
+		height * (0.88 + inheritanceWeight * 0.1),
+		width * (1.0 + branchWeight * 0.18),
+		-0.075 + lexiconLean * 0.28,
+		width * (0.25 + fold * 0.08),
+		0.52,
+		time * 0.32 + seed * 6.28
 	);
-	color += flareHSV(accentHue, 0.68, 1.0) * bloom * (0.16 + metadataWeight * 0.12);
-
-	float lobes = floor(4.0 + lobeWeight * 7.0 + depthWeight * 2.0);
-	for (int index = 0; index < 14; index += 1) {
-		if (float(index) >= lobes) {
-			break;
-		}
-		float fi = float(index);
-		float a = flareHash(seed * 9.1 + fi * 1.37 + shapeSeed);
-		float b = flareHash(paletteSeed * 8.3 + fi * 2.11 + foldSeed);
-		float c = flareHash(motionSeed * 7.7 + fi * 3.17 + horizontalBias);
-		float sideDirection = index == 0 ? 0.0 : (index % 2 == 0 ? 1.0 : -1.0);
-		float side = sideDirection * (0.14 + b * (0.3 + branchWeight * 0.28)) + (c - 0.5) * 0.14;
-		float lobeHeight = height * ((index == 0 ? 1.35 : 0.5 + a * 0.42) + depthWeight * 0.1 + inheritanceWeight * 0.06);
-		float lobeWidth = width * ((index == 0 ? 0.78 : 0.3 + b * 0.34) + branchWeight * 0.12);
-		float phase = time * (0.36 + b * 0.52) + c * M_PI_F * 2.0;
-		float lobe = flameLobe(
-			uv,
-			float2(base.x + width * side * 0.42, base.y - a * 0.025),
-			lobeHeight * (1.0 + sin(phase) * 0.035),
-			lobeWidth * (1.0 + cos(phase * 0.72 + foldSeed * M_PI_F) * 0.025),
-			centerLean * (0.5 + b * 0.4) + width * ((a - 0.5) * 0.3 + side * 0.28),
-			width * ((c - 0.5) * (0.32 + metadataWeight * 0.24) + fold * 0.18),
-			0.22 + b * 0.28 + metadataWeight * 0.1,
-			phase
-		);
-		lobe = pow(lobe, 1.16);
-		float hue = mix(accentHue, primaryHue, float(index % 3) * 0.32) + (a - 0.5) * 0.12 + inheritanceWeight * 0.05;
-		float opacity = index == 0 ? 0.55 : 0.17 + c * 0.18 + metadataWeight * 0.08;
-		color += flareHSV(hue, 0.78 + inheritanceWeight * 0.12, 1.0) * lobe * opacity;
-		color += flareHSV(coreHue + a * 0.04, 0.42 + rhythmWeight * 0.22, 1.0) * lobe * opacity * 0.32;
-	}
-
-	float core = flameLobe(
+	float rightOuter = flameLobe(
 		uv,
-		float2(base.x + centerLean * 0.08, base.y - 0.01),
-		height * (0.64 + inheritanceWeight * 0.16 + depthWeight * 0.06),
-		width * (0.34 + rhythmWeight * 0.16),
-		centerLean * 0.42 + width * (shapeSeed - 0.5) * 0.18,
-		fold * width * (0.12 + connectionWeight * 0.12),
-		0.22 + metadataWeight * 0.1,
-		time + foldSeed * 11.0
+		float2(base.x + width * 0.28, base.y - 0.01),
+		height * (0.9 + depthWeight * 0.08),
+		width * (0.94 + leafWeight * 0.18),
+		0.105 + lexiconLean * 0.34,
+		width * (-0.18 + fold * 0.06),
+		0.46,
+		time * 0.36 + shapeSeed * 6.28
 	);
-	core = pow(core, 1.08);
-	color += mix(flareHSV(coreHue, 0.56 + rhythmWeight * 0.2, 1.0), float3(1.0), 0.16) * core * 0.48;
+	float crown = flameLobe(
+		uv,
+		float2(base.x + lexiconLean * 0.08, base.y - 0.02),
+		height * (1.08 + depthWeight * 0.06),
+		width * (0.72 + branchWeight * 0.08),
+		0.025 + lexiconLean * 0.38,
+		width * (0.13 + fold * 0.1),
+		0.32,
+		time * 0.34 + foldSeed * 6.28
+	);
+	float lowerCurl = flameLobe(
+		uv,
+		float2(base.x + width * 0.34, base.y + 0.005),
+		height * (0.45 + metadataWeight * 0.08),
+		width * (0.58 + connectionWeight * 0.1),
+		0.13 + lexiconLean * 0.22,
+		width * (-0.42 + fold * 0.08),
+		0.24,
+		time * 0.5 + paletteSeed * 6.28
+	);
+	float innerCore = flameLobe(
+		uv,
+		float2(base.x + width * 0.06, base.y + 0.006),
+		height * (0.62 + rhythmWeight * 0.08),
+		width * (0.36 + metadataWeight * 0.06),
+		0.035 + lexiconLean * 0.26,
+		width * (0.06 + fold * 0.06),
+		0.18,
+		time * 0.42 + motionSeed * 6.28
+	);
+
+	leftOuter = pow(leftOuter, 1.04);
+	rightOuter = pow(rightOuter, 1.06);
+	crown = pow(crown, 1.08);
+	lowerCurl = pow(lowerCurl, 1.02);
+	innerCore = pow(innerCore, 0.96);
+	float bodyMask = max(max(leftOuter, rightOuter), max(crown, lowerCurl));
+
+	color += flareHSV(violetHue, 0.36 + connectionWeight * 0.08, 0.95) * leftOuter * (0.32 + inheritanceWeight * 0.08);
+	color += flareHSV(roseHue, 0.7 + metadataWeight * 0.08, 1.0) * rightOuter * (0.46 + metadataWeight * 0.08);
+	color += flareHSV(warmHue + 0.035, 0.7, 1.0) * crown * (0.58 + depthWeight * 0.08);
+	color += flareHSV(roseHue + 0.035, 0.76, 1.0) * lowerCurl * (0.58 + connectionWeight * 0.1);
+	color += mix(flareHSV(coreHueResolved, 0.5, 1.0), float3(1.0), 0.24) * innerCore * 0.72;
 
 	float ridge = 0.0;
-	for (int index = 0; index < 18; index += 1) {
+	for (int index = 0; index < 24; index += 1) {
 		float fi = float(index);
 		float a = flareHash(seed * 4.7 + fi * 1.61);
 		float b = flareHash(foldSeed * 5.3 + fi * 2.71);
-		float t = clamp((base.y - uv.y) / max(height * (0.52 + a * 0.38), 0.001), 0.0, 1.0);
-		float x = base.x + (b - 0.5) * width * (0.8 + branchWeight * 0.6) * (1.0 - t * 0.28) + centerLean * t + sin(t * 8.0 + time * (0.25 + a * 0.2)) * width * 0.08;
-		float line = exp(-pow(abs(uv.x - x) / (0.0025 + metadataWeight * 0.003), 2.0));
-		ridge += line * smoothstep(0.02, 0.18, t) * smoothstep(1.0, 0.58, t) * (0.025 + a * 0.045);
+		float t = clamp((base.y - uv.y) / max(height * (0.72 + a * 0.26), 0.001), 0.0, 1.0);
+		float side = index % 2 == 0 ? -1.0 : 1.0;
+		float x = base.x +
+			side * width * (0.08 + b * split * 0.48) * pow(sin(t * M_PI_F), 0.82) +
+			lexiconLean * t +
+			sin(t * 9.0 + time * (0.18 + a * 0.15)) * width * 0.035;
+		float line = exp(-pow(abs(uv.x - x) / (0.0022 + metadataWeight * 0.002), 2.0));
+		ridge += line * bodyMask * smoothstep(0.04, 0.18, t) * smoothstep(1.0, 0.7, t) * (0.035 + a * 0.045);
 	}
-	color += mix(flareHSV(accentHue, 0.52, 1.0), float3(1.0), 0.3) * ridge * 0.78;
+	color += mix(flareHSV(roseHue, 0.48, 1.0), float3(1.0), 0.42) * ridge;
 
 	float vignette = smoothstep(0.56, 0.18, length(uv));
 	color *= vignette;
-	color = color / (color + 0.95);
+	color *= smoothstep(0.002, 0.045, bodyMask + plate + aura * 0.45);
+	color = 1.0 - exp(-color * 1.2);
 	return half4(half3(color), sourceColor.a);
 }
 
