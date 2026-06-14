@@ -163,7 +163,7 @@ struct FractalFlareView: View {
 		)
 	}
 
-	private static let animationSpeed = 2.35
+	private static let animationSpeed = 3.2
 
 	private struct Profile: Sendable {
 		var nodeCount = 0

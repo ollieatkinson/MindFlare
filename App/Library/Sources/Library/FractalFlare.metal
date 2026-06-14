@@ -98,7 +98,7 @@ static float segmentGlow(float2 point, float2 start, float2 end, float width) {
 	centered.y /= dimensions.x / dimensions.y;
 
 	float countWeight = max(nodeWeight, nodeMass);
-	float flameCount = floor(1.0 + clamp(synonymWeight * 3.2 + connectionWeight * 1.8 + lobeWeight * 1.4, 0.0, 5.0));
+	float flameCount = floor(1.0 + clamp(synonymWeight * 2.2 + connectionWeight * 1.6 + lobeWeight * 1.2, 0.0, 4.0));
 	float flowSpeed = 0.24 + motionSeed * 0.11 + connectionWeight * 0.07 + rhythmWeight * 0.05;
 	float heightNoise = flareFBM(float2(time * 0.3 + seed * 8.0, shapeSeed * 12.0), foldSeed);
 	float flameHeight = clamp(0.62 + heightNoise * 0.18 + depthWeight * 0.08 + countWeight * 0.08, 0.56, 0.94);
@@ -109,7 +109,7 @@ static float segmentGlow(float2 point, float2 start, float2 end, float width) {
 	float twist = ((turbulence - 0.5) / distance) *
 		smoothstep(-0.2, 0.4, uv.y) *
 		(0.38 + inheritanceWeight * 0.16 + connectionWeight * 0.12);
-	float2 warped = centered + flareRotate(centered, twist) * (0.36 + branchWeight * 0.08);
+	float2 warped = mix(centered, flareRotate(centered, twist), 0.58 + branchWeight * 0.12);
 
 	float lean = (horizontalBias - 0.5) * 0.12 +
 		sin(time * (0.48 + motionSeed * 0.25) + seed * M_PI_F * 2.0) * (0.025 + connectionWeight * 0.02);
@@ -120,16 +120,20 @@ static float segmentGlow(float2 point, float2 start, float2 end, float width) {
 	centerline += (turbulence - 0.5) * (0.035 + metadataWeight * 0.03) * smoothstep(0.08, 0.92, uv.y);
 
 	float normalizedY = clamp(uv.y / max(flameHeight, 0.001), 0.0, 1.0);
-	float baseWidth = 0.17 + countWeight * 0.04 + branchWeight * 0.025;
-	float tipWidth = 0.018 + synonymWeight * 0.014 + leafWeight * 0.012;
+	float edgeNoise = flareFBM(float2(uv.y * (3.8 + shapeSeed * 2.2), time * 0.72 + foldSeed * 5.0), seed + metadataWeight);
+	float baseWidth = 0.22 + countWeight * 0.055 + branchWeight * 0.035;
+	float tipWidth = 0.028 + synonymWeight * 0.014 + leafWeight * 0.01;
 	float width = mix(baseWidth, tipWidth, pow(normalizedY, 0.82));
-	width *= 1.0 + (turbulence - 0.5) * (0.26 + inheritanceWeight * 0.18);
-	width = max(width, 0.012);
+	width *= 1.0 + (turbulence - 0.5) * (0.2 + inheritanceWeight * 0.12);
+	width = max(width, 0.018);
 
 	float verticalGate = smoothstep(0.0, 0.08, uv.y) * smoothstep(flameHeight, flameHeight - 0.16, uv.y);
-	float body = clamp(1.0 - abs(warped.x - centerline) / width, 0.0, 1.0) * verticalGate;
-	float flame = pow(body, 1.7);
-	float core = pow(clamp(1.0 - abs(warped.x - centerline) / max(width * 0.45, 0.006), 0.0, 1.0) * verticalGate, 3.2);
+	float silhouette = warped.x - centerline + (edgeNoise - 0.5) * width * (0.32 + metadataWeight * 0.18);
+	float outerEnvelope = exp(-pow(abs(silhouette) / width, 2.05)) * verticalGate;
+	float innerEnvelope = exp(-pow(abs(silhouette) / max(width * 0.38, 0.008), 2.45)) * verticalGate;
+	float body = outerEnvelope;
+	float flame = pow(outerEnvelope, 0.82);
+	float core = pow(innerEnvelope, 1.65) * (0.72 + countWeight * 0.18);
 
 	for (int index = 1; index < 6; index += 1) {
 		float enabled = step(float(index), flameCount);
@@ -141,10 +145,11 @@ static float segmentGlow(float2 point, float2 start, float2 end, float width) {
 		float localCenter = centerline +
 			side * (0.052 + synonymWeight * 0.07 + branchWeight * 0.025 + tongueSeed * 0.035) * rise +
 			sin(time * (0.7 + tongueSeed * 0.45) + uv.y * 7.0 + tongueSeed * 6.28) * 0.018 * rise;
-		float localWidth = width * (0.44 + tongueSeed * 0.24 + connectionWeight * 0.12);
-		float tongue = clamp(1.0 - abs(warped.x - localCenter) / max(localWidth, 0.008), 0.0, 1.0) * localGate;
-		flame = max(flame, pow(tongue, 2.1) * enabled * (0.48 + inheritanceWeight * 0.18 + synonymWeight * 0.14));
-		core = max(core, pow(tongue, 4.0) * enabled * 0.34);
+		float localWidth = width * (0.58 + tongueSeed * 0.2 + connectionWeight * 0.1);
+		float tongueDistance = abs(warped.x - localCenter) / max(localWidth, 0.01);
+		float tongue = exp(-pow(tongueDistance, 2.2)) * localGate;
+		flame = max(flame, pow(tongue, 1.45) * enabled * (0.24 + inheritanceWeight * 0.1 + synonymWeight * 0.08));
+		core = max(core, pow(tongue, 3.7) * enabled * 0.12);
 	}
 
 	float blueBase = pow(clamp(body * 0.95, 0.0, 1.0), 8.0);
@@ -158,11 +163,12 @@ static float segmentGlow(float2 point, float2 start, float2 end, float width) {
 	float3 ember = flareHSV(redHue, 0.94, 1.0);
 	float3 amber = flareHSV(amberHue, 0.86, 1.0);
 	float3 white = mix(flareHSV(whiteHue, 0.22, 1.0), float3(1.0, 0.98, 0.78), 0.76);
-	float intensity = clamp(flame + core * 0.8, 0.0, 1.0);
-	float3 flameColor = mix(ember, amber, smoothstep(0.04, 0.48, intensity));
-	flameColor = mix(flameColor, white, smoothstep(0.38, 1.0, core + flame * 0.18));
-	flameColor = mix(flameColor, flareHSV(0.62, 0.72, 0.95), blueBase * 0.35);
-	flameColor *= (flame * 0.86 + core * 0.62) * (0.92 + countWeight * 0.18 + inheritanceWeight * 0.08);
+	float3 flameColor =
+		ember * pow(flame, 0.68) * 0.48 +
+		amber * pow(flame, 1.08) * 0.78 +
+		white * core * 0.86;
+	flameColor = mix(flameColor, flareHSV(0.62, 0.72, 0.95), blueBase * 0.28);
+	flameColor *= 0.94 + countWeight * 0.16 + inheritanceWeight * 0.08;
 
 	float haloNoise = flareFBM(float2(time * 0.06 + seed, paletteSeed * 5.0), shapeSeed);
 	float haloSize = 0.47 + depthWeight * 0.08 + countWeight * 0.07;
