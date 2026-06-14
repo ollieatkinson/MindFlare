@@ -6,55 +6,55 @@ import SwiftUI
 import Lexicon
 
 struct Editor: View {
-	
+
 	@EnvironmentObject var my: Object
 
 	@Environment(\.events) var events
-    @Environment(\.animated) var animated
+	@Environment(\.animated) var animated
 	@Environment(\.undoManager) var undoManager
-	
+
 	@Environment(\.focusedDocumentID) var focusedDocumentID
 	@Environment(\.documentID) var documentID
-	
+
 	let document: Document
-	
+
 	@Binding var isExporting: Bool
 
-    var body: some View {
-        
-        VStack(alignment: .leading, spacing: 8) {
+	var body: some View {
+
+		VStack(alignment: .leading, spacing: 8) {
 			CompositionDiagnosticsView(
 				diagnostics: my.snapshot.compositionDiagnostics,
 				grantFolderAccess: my.pendingImportAccessRequest == nil && my.fileURL == nil ? nil : {
 					my.grantImportFolderAccess()
 				}
 			)
-            CLIView(text: my.ui.text)
-            ColumnsView(columns: my.ui.columns)
-            PropertiesView(ui: my.ui.properties)
-        }
+			CLIView(text: my.ui.text)
+			ColumnsView(columns: my.ui.columns)
+			PropertiesView(ui: my.ui.properties)
+		}
 		.cliEvents(for: my.doc.browser.cli)
 		.searchable(my.doc.editor.search, in: Binding(get: { my.cli.lemma.lexicon }, set: { _ in }))
-		
-        .animation(animated ? .default : nil, value: my.cli)
+
+		.animation(animated ? .default : nil, value: my.cli)
 		.padding(.horizontal)
-        .padding(.bottom)
-        
-        .fileExporter(
+		.padding(.bottom)
+
+		.fileExporter(
 			isPresented: $isExporting,
-            document: document,
+			document: document,
 			contentType: document.export?.generator.utType ?? .data,
-            defaultFilename: document.description
-        ) { _ in }
-		
+			defaultFilename: document.description
+		) { _ in }
+
 		.onChange(of: document) { _, document in
 			my.document = document
 		}
-		
+
 		.onChange(of: document.snapshot) { _, snapshot in
 			my.revert(to: snapshot)
 		}
-		
+
 		.onChange(of: my.snapshot) { _, snapshot in
 			document.update(with: snapshot, undo: undoManager)
 		}
@@ -63,10 +63,10 @@ struct Editor: View {
 			my.focusedDocumentID = focusedDocumentID
 		}
 
-        .onAppear {
-            my.focusedDocumentID = focusedDocumentID
-        }
-    }
+		.onAppear {
+			my.focusedDocumentID = focusedDocumentID
+		}
+	}
 }
 
 struct CompositionDiagnosticsView: View {

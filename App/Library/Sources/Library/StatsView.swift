@@ -6,77 +6,77 @@ import SwiftUI
 import Lexicon
 
 struct StatsButton: View {
-	
+
 	let id: UInt
-    
-    @Environment(\.events) var events
-    
-    @State var my: Editor.Object?
-    
-    var body: some View {
-        Button {
-            app.menu.view.stats >> events
-        } label: {
-            Label("Stats", systemImage: "flame")
-        }
-        .help("Show Stats (⌘ L)")
-        .on(app.document[id].editor.show.stats) { _ in
-            guard my == nil else {
-                my = nil
-                return
-            }
-            my = Editor.Object.instance(id: id)
-        }
-        .popover(item: $my) { my in
-            StatsView().environmentObject(my)
-        }
-    }
+
+	@Environment(\.events) var events
+
+	@State var my: Editor.Object?
+
+	var body: some View {
+		Button {
+			app.menu.view.stats >> events
+		} label: {
+			Label("Stats", systemImage: "flame")
+		}
+		.help("Show Stats (⌘ L)")
+		.on(app.document[id].editor.show.stats) { _ in
+			guard my == nil else {
+				my = nil
+				return
+			}
+			my = Editor.Object.instance(id: id)
+		}
+		.popover(item: $my) { my in
+			StatsView().environmentObject(my)
+		}
+	}
 }
 
 struct StatsView: View {
-    
-    @EnvironmentObject var my: Editor.Object
-    
-    @State var name = "..."
-    @State var count = (nodes: "", synonyms: "", types: "")
-    
-    var body: some View {
+
+	@EnvironmentObject var my: Editor.Object
+
+	@State var name = "..."
+	@State var count = (nodes: "", synonyms: "", types: "")
+
+	var body: some View {
 		VStack(alignment: .center) {
 			FractalFlareView(graph: my.snapshot.graph)
 				.frame(width: 256, height: 256)
 			Text("MindFlare")
-                .font(.title)
-            Divider()
-            HStack {
+				.font(.title)
+			Divider()
+			HStack {
 				Spacer()
-                VStack(alignment: .leading) {
-                    Text("Lexicon \t\t\(name)")
-                    Text("Nodes \t\t\(count.nodes)")
-                    Text("Synonyms \t\(count.synonyms)")
-                    Text("Inheritance \t\(count.types)")
-                }.fixedSize()
-                Spacer()
-            }
-            Divider()
+				VStack(alignment: .leading) {
+					Text("Lexicon \t\t\(name)")
+					Text("Nodes \t\t\(count.nodes)")
+					Text("Synonyms \t\(count.synonyms)")
+					Text("Inheritance \t\(count.types)")
+				}.fixedSize()
+				Spacer()
+			}
+			Divider()
 			Text(my.snapshot.graph.date.formatted(date: .long, time: .shortened))
-                .font(.caption)
-        }
-        .padding()
-        .task {
-            
+				.font(.caption)
+		}
+		.padding()
+		.task {
+
 			self.name = my.snapshot.graph.root.name
-            
-            var count = (nodes: 0, synonyms: 0, types: 0)
-            
+
+			var count = (nodes: 0, synonyms: 0, types: 0)
+
 			my.snapshot.graph.root.traverse(name: "o") { id, name, node in
-                count.nodes += 1
-                count.synonyms += node.protonym == nil ? 0 : 1
-                count.types += node.type.count
-            }
-            
-            self.count = ("\(count.nodes)", "\(count.synonyms)", "\(count.types)")
-        }
-    }
+				count.nodes += 1
+				count.synonyms += node.protonym == nil ? 0 : 1
+				count.types += node.type.count
+			}
+
+			self.count = ("\(count.nodes)", "\(count.synonyms)", "\(count.types)")
+		}
+	}
 }
 
 struct FractalFlareView: View {

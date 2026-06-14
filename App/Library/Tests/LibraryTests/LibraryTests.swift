@@ -64,7 +64,7 @@ final class LibraryTests: Hopes {
 
 		XCTAssertEqual(lhs, rhs)
 	}
-	
+
 	func testConnectedLexiconCompositionResolvesLocalFileConnections() throws {
 		let directory = FileManager.default.temporaryDirectory
 			.appendingPathComponent(UUID().uuidString, isDirectory: true)

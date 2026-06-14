@@ -7,52 +7,52 @@ import Lexicon
 import LexiconGenerators
 
 public struct MindFlareApp: App {
-	
+
 	@NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
-	
+
 	@AppStorage("animated") var animated = false
 	@AppStorage("launchCount") var launchCount = 0
 
 	@Environment(\.events) var events
-	
+
 	@FocusedValue(\.focusedDocumentID) var focusedDocumentID
-	
+
 	@State var documentCount = 0
-	
+
 	var bear: Mind = [] // TODO: @State and where to +=
-	
+
 	@Bear var mind: Mind {
-		
+
 		events.on { event in
 			print("🎙", event)
 		}
 	}
-	
+
 	public init() {
 		launchCount += 1
 		bear.in(mind)
 		app.did.launch >> events
 	}
-	
+
 	public var body: some Scene {
-		
+
 		// WindowGroup {
 		//     if documentCount < 1 {
 		//         WelcomeView()
 		//             .windowEnvironmentValue()
 		//     }
 		// }
-		
+
 		DocumentGroup(newDocument: Document.newDocument) { file in
-			
+
 			Editor.LoadingView(document: file.document, fileURL: file.fileURL, animated: $animated)
-			
+
 				.environment(\.focusedDocumentID, focusedDocumentID)
-			
+
 				.environment(\.animated, animated)
-			
+
 				.windowEnvironmentValue()
-			
+
 				.onAppear {
 					documentCount += 1
 				}
@@ -60,11 +60,11 @@ public struct MindFlareApp: App {
 					documentCount -= 1
 				}
 		}
-		
+
 		.commands {
-			
+
 			CommandGroup(after: .newItem) {
-				
+
 				Divider()
 					.onAppear {
 						if documentCount == 0, launchCount == 1 {
@@ -79,18 +79,18 @@ public struct MindFlareApp: App {
 						}
 //						 launchCount = 0 // TODO: remove
 					}
-				
+
 				let pb = NSPasteboard.general
-				
+
 				Menu("New from Example") {
-					
+
 					let examples = [
 						"Test",
 						"Hello",
 						"MindFlare",
 						"Alice in Wonderland",
 					]
-					
+
 					ForEach(examples, id: \.self) { example in
 						Button(example) {
 							do {
@@ -103,7 +103,7 @@ public struct MindFlareApp: App {
 						}
 					}
 				}
-				
+
 				Button("New from Clipboard") {
 					guard
 						let string = pb
@@ -133,7 +133,7 @@ public struct MindFlareApp: App {
 				.keyboardShortcut("n", modifiers: [.shift, .option, .command])
 				// .disabled(pb.string(forType: .string)?.isNotEmpty ?? false) // TODO: !
 			}
-			
+
 			CommandGroup(after: .undoRedo) {
 				Divider()
 				Button(\.edit.commit, events).keyboardShortcut(.return, modifiers: [])
@@ -143,7 +143,7 @@ public struct MindFlareApp: App {
 				Button(\.edit.inherit, events).keyboardShortcut("i", modifiers: .command)
 				Button(\.edit.synonym, events).keyboardShortcut("i", modifiers: [.shift, .command])
 			}
-			
+
 			CommandGroup(replacing: .pasteboard) {
 				Button(\.edit.cut, events).keyboardShortcut("x", modifiers: .command)
 				Button(\.edit.copy.lemma, events).keyboardShortcut("c", modifiers: .command)
@@ -151,7 +151,7 @@ public struct MindFlareApp: App {
 				Button(\.edit.paste.default, events).keyboardShortcut("v", modifiers: .command)
 				Button(\.edit.paste.sentences, events).keyboardShortcut("v", modifiers: [.option, .command])
 			}
-			
+
 			// TODO: ↓
 			// CommandGroup(after: .textEditing) {
 			//     if my.isRecording {
@@ -160,9 +160,9 @@ public struct MindFlareApp: App {
 			//         Button(\.edit.recording.start, events)
 			//     }
 			// }
-			
+
 			// TODO: ⌘ F for Find
-			
+
 			CommandGroup(replacing: .toolbar) {
 				Button(\.view.back, events).keyboardShortcut(.leftArrow, modifiers: .option)
 				Button(\.view.forward, events).keyboardShortcut(.rightArrow, modifiers: .option)
@@ -171,7 +171,7 @@ public struct MindFlareApp: App {
 				Button(\.view.theme.toggle, events).keyboardShortcut("8", modifiers: .command)
 				Divider()
 			}
-			
+
 			CommandGroup(after: .saveItem) {
 				Menu(app.menu.file.export(\.localizedType)) {
 					ForEach(Array(Lexicon.Graph.JSON.generators), id: \.key) { (name, generator) in
@@ -191,7 +191,7 @@ public struct MindFlareApp: App {
 }
 
 private extension Button where Label == Text {
-	
+
 	init<A: L>(_ event: KeyPath<I_app_menu, A>, _ events: Events) {
 		let menuEvent = app.menu[keyPath: event]
 		self.init(A.localized) {

@@ -7,7 +7,7 @@ import XCTest
 
 class MindFlareTests: XCTestCase {
 
-    func test() {
-        
-    }
+	func test() {
+
+	}
 }

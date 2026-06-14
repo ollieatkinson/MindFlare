@@ -5,9 +5,9 @@
 import SwiftUI
 
 extension NSColor {
-    
-    var ui: Color {
-        Color(nsColor: self)
-    }
+
+	var ui: Color {
+		Color(nsColor: self)
+	}
 }
 

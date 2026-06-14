@@ -3,6 +3,6 @@
 //
 
 public extension Bool {
-    
-    @inlinable var not: Bool { !self }
+
+	@inlinable var not: Bool { !self }
 }

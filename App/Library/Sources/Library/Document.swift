@@ -345,14 +345,14 @@ final class Document: Identifiable, ObservableObject, ReferenceFileDocument, Cus
 
 	func fileWrapper(snapshot: Snapshot, configuration: WriteConfiguration) throws -> FileWrapper {
 
-        let data: Data
+		let data: Data
 
-        switch configuration.contentType {
+		switch configuration.contentType {
 
 			case .lexicon, .taskpaper:
 				data = try TaskPaper.encode(snapshot.document).data(using: .utf8).try()
 
-            default:
+			default:
 				guard
 					let export = storage.withLock({ storage in storage.export }),
 					export.generator.utType == configuration.contentType
@@ -360,9 +360,9 @@ final class Document: Identifiable, ObservableObject, ReferenceFileDocument, Cus
 					throw CocoaError(.fileWriteUnknown)
 				}
 				data = try export.generator.generate(export.json)
-        }
+		}
 
-        return FileWrapper(regularFileWithContents: data)
+		return FileWrapper(regularFileWithContents: data)
 	}
 }
 
