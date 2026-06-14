@@ -8,14 +8,26 @@ import Foundation
 import SwiftUI
 
 @MainActor final class LexiconSearchModel: ObservableObject {
+
+	struct Presentation: Identifiable, Equatable {
+		let query: String
+
+		var id: String {
+			query
+		}
+	}
+
 	@Binding var lexicon: Lexicon
 
 	@Published var suggestions: [String] = []
+	@Published var results: [Lexicon.Search.Result] = []
+	@Published var presentation: Presentation?
+	@Published var isSearching = false
 
 	var query: String = "" { didSet { stream.send(query) }}
-	var store: [String: [String]] = [:]
+	var store: [String: [Lexicon.Search.Result]] = [:]
 
-	private var task: Task<(), Error>?
+	private var task: Task<Void, Never>?
 
 	private let stream = PassthroughSubject<String, Never>()
 	private var bag: Set<AnyCancellable> = []
@@ -29,6 +41,19 @@ import SwiftUI
 			.store(in: &bag)
 	}
 
+	func submit(_ query: String) {
+		let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !query.isEmpty else {
+			return
+		}
+		presentation = Presentation(query: query)
+		update(to: query)
+	}
+
+	func dismiss() {
+		presentation = nil
+	}
+
 	private func update(to query: String) {
 		task?.cancel()
 
@@ -36,54 +61,66 @@ import SwiftUI
 
 		guard !query.isEmpty else {
 			store = [:]
+			results = []
 			suggestions = []
+			isSearching = false
 			return
 		}
 
 		let cacheKey = query.localizedLowercase
 
 		if let stored = store[cacheKey] {
-			suggestions = stored
+			results = stored
+			suggestions = stored.map(\.id)
+			isSearching = false
 			return
 		}
 
-		task = Task.detached { @Sendable [weak self] in
+		isSearching = true
 
-			guard let self = self else { return }
+		task = Task { [weak self] in
 
-			try Task.checkCancellation()
+			guard let self else {
+				return
+			}
 
 			let document = await self.lexicon.document
-			let suggestions = await Self.suggestions(for: query, in: document)
+			let results = await Self.results(for: query, in: document)
 
-			Task { @MainActor [weak self] in
-				guard let self = self else { return }
-				self.store[cacheKey] = suggestions
-				guard !Task.isCancelled else { return }
-				guard query == self.query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
-				self.suggestions = suggestions
+			store[cacheKey] = results
+			guard !Task.isCancelled else {
+				return
 			}
+			guard query == self.query.trimmingCharacters(in: .whitespacesAndNewlines) || self.presentation?.query == query else {
+				return
+			}
+			self.results = results
+			self.suggestions = results.map(\.id)
+			self.isSearching = false
 		}
 	}
 
-	private static func suggestions(for query: String, in document: Lexicon.Document) async -> [String] {
+	nonisolated static func results(
+		for query: String,
+		in document: Lexicon.Document,
+		limit: Int = 1_000
+	) async -> [Lexicon.Search.Result] {
 		let options = Lexicon.Search.Options(
-			limit: 1000,
+			limit: limit,
 			mode: .hybrid,
-			scope: .live,
-			bounds: .init(depth: 4, candidates: 200, budget: 10_000)
+			scope: .full
 		)
 		let index = Lexicon.Search.Index(document: document, options: options)
 
 		do {
-			return try await index.search(query, in: document).map(\.id)
+			return try await index.search(query, in: document)
 		} catch {
 			let fallback = Lexicon.Search.Options(
-				limit: 1000,
+				limit: limit,
 				mode: [.lexical, .token],
 				scope: .own
 			)
-			return document.search(query, options: fallback).map(\.id)
+			return document.search(query, options: fallback)
 		}
 	}
 }

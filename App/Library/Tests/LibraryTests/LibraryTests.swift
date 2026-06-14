@@ -194,6 +194,44 @@ final class LibraryTests: Hopes {
 		XCTAssertEqual(descendantConnections.map(\.path), ["organization.engineering"])
 	}
 
+	func testSearchModelReturnsFullHybridResultsWithMetadataEvidence() async throws {
+		let document = try TaskPaper("""
+			commerce:
+				capability:
+					receipt:
+				checkout:
+				+ commerce.capability
+					# Checkout support comments mention refunds.
+					> Refund review status appears in support workflows.
+			""").decodeDocument()
+		let noteResults = await LexiconSearchModel.results(for: "refund review", in: document, limit: 10)
+		let commentResults = await LexiconSearchModel.results(for: "support comments", in: document, limit: 10)
+		let noteMatch = try noteResults.first { $0.id == "commerce.checkout" }.try()
+		let commentMatch = try commentResults.first { $0.id == "commerce.checkout" }.try()
+
+		XCTAssertEqual(noteResults.first?.id, "commerce.checkout")
+		XCTAssertEqual(commentResults.first?.id, "commerce.checkout")
+		XCTAssert(noteMatch.matches.contains { $0.field == .note })
+		XCTAssert(commentMatch.matches.contains { $0.field == .comment })
+		XCTAssertEqual(noteMatch.notes, ["Refund review status appears in support workflows."])
+		XCTAssertEqual(commentMatch.comments, ["Checkout support comments mention refunds."])
+	}
+
+	func testSearchModelUsesFullScopeResolvedContext() async throws {
+		let document = try TaskPaper("""
+			commerce:
+				capability:
+					receipt:
+				checkout:
+				+ commerce.capability
+			""").decodeDocument()
+		let results = await LexiconSearchModel.results(for: "receipt", in: document, limit: 20)
+		let checkout = try results.first { $0.id == "commerce.checkout" }.try()
+
+		XCTAssert(results.map(\.id).contains("commerce.checkout.receipt"))
+		XCTAssert(checkout.matches.contains { $0.field == .contextChild })
+	}
+
 	func testImportAccessRequestNamesMissingFileAndGrantFolder() {
 		let request = SecurityScopedImportAccess.Request(
 			fileURL: URL(fileURLWithPath: "/Users/example/Lexicons/shared-commerce.lexicon"),
