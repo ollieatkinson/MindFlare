@@ -103,13 +103,17 @@ private enum StatsVisualization: String, Hashable {
 
 struct FractalFlareView: View {
 
-	let graph: Lexicon.Graph
+	private let profile: Profile
+
+	init(graph: Lexicon.Graph) {
+		self.profile = Profile(graph)
+	}
 
 	var body: some View {
 		TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
 			Canvas(rendersAsynchronously: true) { context, size in
 				Self.draw(
-					graph: graph,
+					profile: profile,
 					in: &context,
 					size: size,
 					time: timeline.date.timeIntervalSinceReferenceDate
@@ -130,15 +134,19 @@ struct FractalFlareView: View {
 	}
 
 	nonisolated private static func draw(
-		graph: Lexicon.Graph,
+		profile: Profile,
 		in context: inout GraphicsContext,
 		size: CGSize,
 		time: TimeInterval
 	) {
-		let profile = Profile(graph)
 		let scale = min(size.width, size.height)
-		let center = CGPoint(x: size.width * 0.5, y: size.height * 0.53)
-		let pulse = CGFloat(sin(time * 1.05 + Double(profile.seed) * Double.pi * 2)) * 0.5 + 0.5
+		let center = CGPoint(
+			x: size.width * (0.49 + profile.horizontalBias * 0.04),
+			y: size.height * 0.53
+		)
+		let pulse = CGFloat(
+			sin(time * (0.82 + Double(profile.motionSeed) * 0.5) + Double(profile.seed) * Double.pi * 2)
+		) * 0.5 + 0.5
 
 		drawLogoGlow(
 			in: &context,
@@ -164,17 +172,17 @@ struct FractalFlareView: View {
 		pulse: CGFloat
 	) {
 		let plate = Path(ellipseIn: CGRect(
-			x: center.x - scale * (0.2 + profile.nodeWeight * 0.04),
+			x: center.x - scale * (0.18 + profile.branchWeight * 0.09),
 			y: center.y + scale * 0.22,
-			width: scale * (0.4 + profile.nodeWeight * 0.08),
-			height: scale * (0.08 + profile.connectionWeight * 0.04)
+			width: scale * (0.36 + profile.branchWeight * 0.18 + profile.leafWeight * 0.06),
+			height: scale * (0.07 + profile.connectionWeight * 0.05 + profile.metadataWeight * 0.03)
 		))
 		context.fill(
 			plate,
 			with: .radialGradient(
 				Gradient(colors: [
-					Color(hue: 0.06, saturation: 0.82, brightness: 1).opacity(0.52 + Double(pulse) * 0.12),
-					Color(hue: 0.1, saturation: 0.78, brightness: 0.9).opacity(0.16),
+					Color(hue: hue(profile.primaryHue), saturation: 0.82, brightness: 1).opacity(0.5 + Double(pulse) * 0.14),
+					Color(hue: hue(profile.coreHue), saturation: 0.78, brightness: 0.92).opacity(0.14 + Double(profile.connectionWeight) * 0.08),
 					.clear,
 				]),
 				center: CGPoint(x: center.x, y: center.y + scale * 0.26),
@@ -184,20 +192,23 @@ struct FractalFlareView: View {
 		)
 
 		let aura = Path(ellipseIn: CGRect(
-			x: center.x - scale * 0.34,
-			y: center.y - scale * 0.18,
-			width: scale * 0.68,
-			height: scale * 0.66
+			x: center.x - scale * (0.3 + profile.nodeWeight * 0.04),
+			y: center.y - scale * (0.18 + profile.depthWeight * 0.04),
+			width: scale * (0.6 + profile.nodeWeight * 0.1),
+			height: scale * (0.58 + profile.depthWeight * 0.12)
 		))
 		context.fill(
 			aura,
 			with: .radialGradient(
 				Gradient(colors: [
-					Color(hue: 0.94 + Double(profile.seed) * 0.04, saturation: 0.55, brightness: 1).opacity(0.2 + Double(profile.metadataWeight) * 0.08),
-					Color(hue: 0.06 + Double(profile.inheritanceWeight) * 0.08, saturation: 0.74, brightness: 1).opacity(0.13 + Double(pulse) * 0.04),
+					Color(hue: hue(profile.accentHue), saturation: 0.5 + Double(profile.metadataWeight) * 0.24, brightness: 1).opacity(0.16 + Double(profile.metadataWeight) * 0.12),
+					Color(hue: hue(profile.primaryHue + profile.inheritanceWeight * 0.08), saturation: 0.72, brightness: 1).opacity(0.1 + Double(pulse) * 0.06),
 					.clear,
 				]),
-				center: CGPoint(x: center.x, y: center.y + scale * 0.08),
+				center: CGPoint(
+					x: center.x + scale * (profile.horizontalBias - 0.5) * 0.08,
+					y: center.y + scale * 0.08
+				),
 				startRadius: 0,
 				endRadius: scale * 0.36
 			)
@@ -212,116 +223,82 @@ struct FractalFlareView: View {
 		time: TimeInterval
 	) {
 		let base = CGPoint(x: center.x, y: center.y + scale * 0.25)
-		let sway = CGFloat(sin(time * 0.72 + Double(profile.seed) * Double.pi * 2))
-		let breath = CGFloat(sin(time * 1.18 + Double(profile.depthWeight) * Double.pi))
-		let fold = CGFloat(sin(time * 0.94 + Double(profile.inheritanceWeight) * 5.2))
-		let height = scale * (0.48 + profile.depthWeight * 0.08 + breath * 0.018)
-		let width = scale * (0.25 + profile.nodeWeight * 0.08)
-		let lean = sway * scale * (0.022 + profile.connectionWeight * 0.025)
-
-		let outer = flamePath(
-			base: base,
-			height: height,
-			width: width,
-			lean: lean,
-			curl: fold * scale * 0.025,
-			waist: 0.34 + profile.metadataWeight * 0.08
-		)
-		drawSoftLobe(
-			in: &context,
-			path: outer,
-			base: base,
-			tip: CGPoint(x: base.x + lean + fold * scale * 0.025, y: base.y - height),
-			colors: [
-				Color(hue: 0.01, saturation: 0.84, brightness: 1).opacity(0.42),
-				Color(hue: 0.08, saturation: 0.62, brightness: 1).opacity(0.62),
-				Color(hue: 0.14, saturation: 0.34, brightness: 1).opacity(0.76),
-				Color.white.opacity(0.28),
-			],
-			blur: scale * 0.006
-		)
-
-		let left = flamePath(
-			base: CGPoint(x: base.x - width * 0.12, y: base.y - scale * 0.015),
-			height: height * (0.82 + profile.inheritanceWeight * 0.08),
-			width: width * 0.62,
-			lean: -width * (0.28 + profile.connectionWeight * 0.1) + sway * scale * 0.014,
-			curl: -scale * (0.04 + profile.seed * 0.02) + fold * scale * 0.018,
-			waist: 0.5
-		)
-		drawSoftLobe(
-			in: &context,
-			path: left,
-			base: CGPoint(x: base.x - width * 0.12, y: base.y),
-			tip: CGPoint(x: base.x - width * 0.34 + sway * scale * 0.014, y: base.y - height * 0.78),
-			colors: [
-				Color(hue: 0.78, saturation: 0.32, brightness: 1).opacity(0.24),
-				Color(hue: 0.94, saturation: 0.5, brightness: 1).opacity(0.38),
-				Color(hue: 0.08, saturation: 0.46, brightness: 1).opacity(0.24),
-			],
-			blur: scale * 0.003
-		)
-
-		let right = flamePath(
-			base: CGPoint(x: base.x + width * 0.1, y: base.y - scale * 0.005),
-			height: height * (0.68 + profile.metadataWeight * 0.1),
-			width: width * (0.56 + profile.connectionWeight * 0.08),
-			lean: width * (0.2 + profile.seed * 0.14) + sway * scale * 0.012,
-			curl: scale * 0.05 + fold * scale * 0.016,
-			waist: 0.42
-		)
-		drawSoftLobe(
-			in: &context,
-			path: right,
-			base: CGPoint(x: base.x + width * 0.1, y: base.y),
-			tip: CGPoint(x: base.x + width * 0.28 + sway * scale * 0.012, y: base.y - height * 0.58),
-			colors: [
-				Color(hue: 0.91, saturation: 0.88, brightness: 1).opacity(0.5),
-				Color(hue: 0.98, saturation: 0.72, brightness: 1).opacity(0.58),
-				Color(hue: 0.08, saturation: 0.62, brightness: 1).opacity(0.45),
-			],
-			blur: scale * 0.003
-		)
+		let sway = CGFloat(sin(time * (0.46 + Double(profile.motionSeed) * 0.38) + Double(profile.seed) * Double.pi * 2))
+		let breath = CGFloat(sin(time * (0.9 + Double(profile.shapeSeed) * 0.46) + Double(profile.depthWeight) * Double.pi))
+		let fold = CGFloat(sin(time * (0.68 + Double(profile.foldSeed) * 0.42) + Double(profile.inheritanceWeight) * 5.2))
+		let height = scale * (0.42 + profile.depthWeight * 0.13 + profile.nodeWeight * 0.05 + breath * 0.02)
+		let width = scale * (0.2 + profile.branchWeight * 0.13 + profile.leafWeight * 0.05)
+		let centerLean = (profile.horizontalBias - 0.5) * scale * 0.08 + sway * scale * (0.018 + profile.connectionWeight * 0.03)
 
 		let bloom = lowerBloomPath(
 			center: CGPoint(
-				x: base.x + width * (0.18 + sway * 0.04),
+				x: base.x + centerLean * 0.35,
 				y: base.y - height * 0.16
 			),
-			width: width * (0.66 + profile.connectionWeight * 0.08),
-			height: height * (0.3 + profile.metadataWeight * 0.05),
-			lean: sway * width * 0.1
+			width: width * (0.86 + profile.branchWeight * 0.34),
+			height: height * (0.22 + profile.metadataWeight * 0.14),
+			lean: centerLean * 0.8
 		)
 		drawSoftLobe(
 			in: &context,
 			path: bloom,
-			base: CGPoint(x: base.x + width * 0.18, y: base.y),
-			tip: CGPoint(x: base.x + width * 0.32, y: base.y - height * 0.34),
+			base: CGPoint(x: base.x, y: base.y),
+			tip: CGPoint(x: base.x + centerLean, y: base.y - height * 0.34),
 			colors: [
-				Color(hue: 0.94, saturation: 0.62, brightness: 1).opacity(0.36),
-				Color(hue: 0.02, saturation: 0.8, brightness: 1).opacity(0.48),
-				Color(hue: 0.1, saturation: 0.62, brightness: 1).opacity(0.3),
+				Color(hue: hue(profile.accentHue), saturation: 0.58, brightness: 1).opacity(0.22 + Double(profile.metadataWeight) * 0.14),
+				Color(hue: hue(profile.primaryHue), saturation: 0.82, brightness: 1).opacity(0.36 + Double(profile.inheritanceWeight) * 0.1),
+				Color(hue: hue(profile.coreHue), saturation: 0.62, brightness: 1).opacity(0.2),
 			],
 			blur: scale * 0.004
 		)
 
+		for lobe in profile.lobes {
+			let phase = time * (0.36 + Double(lobe.motion) * 0.52) + Double(lobe.phase) * Double.pi * 2
+			let lobeWave = CGFloat(sin(phase))
+			let lobeFold = CGFloat(cos(phase * 0.72 + Double(profile.foldSeed) * Double.pi))
+			let lobeBase = CGPoint(
+				x: base.x + width * lobe.side * 0.42,
+				y: base.y - height * lobe.baseLift
+			)
+			let lobeHeight = height * lobe.height * (1 + lobeWave * 0.035)
+			let lobeWidth = width * lobe.width * (1 + lobeFold * 0.025)
+			let lobeLean = centerLean * (0.5 + lobe.motion * 0.4) + width * (lobe.lean + lobe.side * 0.28) + sway * scale * 0.006
+			let lobeCurl = width * (lobe.curl + fold * 0.18 + lobeFold * 0.08)
+			let path = flamePath(
+				base: lobeBase,
+				height: lobeHeight,
+				width: lobeWidth,
+				lean: lobeLean,
+				curl: lobeCurl,
+				waist: lobe.waist
+			)
+			drawSoftLobe(
+				in: &context,
+				path: path,
+				base: lobeBase,
+				tip: CGPoint(x: lobeBase.x + lobeLean + lobeCurl, y: lobeBase.y - lobeHeight),
+				colors: flameColors(profile: profile, lobe: lobe),
+				blur: scale * lobe.blur
+			)
+		}
+
 		let core = flamePath(
-			base: CGPoint(x: base.x + width * 0.02, y: base.y - scale * 0.01),
-			height: height * (0.72 + profile.inheritanceWeight * 0.07),
-			width: width * 0.42,
-			lean: width * 0.08 + sway * scale * 0.016,
-			curl: fold * scale * 0.035,
-			waist: 0.3
+			base: CGPoint(x: base.x + centerLean * 0.08, y: base.y - scale * 0.01),
+			height: height * (0.64 + profile.inheritanceWeight * 0.16 + profile.depthWeight * 0.06),
+			width: width * (0.34 + profile.rhythmWeight * 0.16),
+			lean: centerLean * 0.42 + width * (profile.shapeSeed - 0.5) * 0.18,
+			curl: fold * width * (0.12 + profile.connectionWeight * 0.12),
+			waist: 0.22 + profile.metadataWeight * 0.1
 		)
 		drawSoftLobe(
 			in: &context,
 			path: core,
 			base: CGPoint(x: base.x, y: base.y),
-			tip: CGPoint(x: base.x + width * 0.08, y: base.y - height * 0.68),
+			tip: CGPoint(x: base.x + centerLean * 0.32, y: base.y - height * 0.68),
 			colors: [
-				Color.white.opacity(0.58),
-				Color(hue: 0.12, saturation: 0.52, brightness: 1).opacity(0.74),
-				Color(hue: 0.96, saturation: 0.58, brightness: 1).opacity(0.52),
+				Color.white.opacity(0.5 + Double(profile.metadataWeight) * 0.14),
+				Color(hue: hue(profile.coreHue), saturation: 0.48 + Double(profile.rhythmWeight) * 0.24, brightness: 1).opacity(0.72),
+				Color(hue: hue(profile.accentHue), saturation: 0.54, brightness: 1).opacity(0.42),
 			],
 			blur: 0
 		)
@@ -332,7 +309,7 @@ struct FractalFlareView: View {
 			height: height,
 			width: width,
 			sway: sway,
-			fold: fold,
+			fold: fold + centerLean / max(width, 1),
 			profile: profile,
 			time: time
 		)
@@ -367,6 +344,18 @@ struct FractalFlareView: View {
 				endPoint: tip
 			)
 		)
+	}
+
+	nonisolated private static func flameColors(profile: Profile, lobe: Lobe) -> [Color] {
+		let warmth = profile.primaryHue + lobe.hueShift
+		let accent = profile.accentHue + lobe.hueShift * 0.7
+		let core = profile.coreHue + lobe.seed * 0.05
+		return [
+			Color(hue: hue(accent), saturation: 0.44 + Double(lobe.metadata) * 0.28, brightness: 1).opacity(Double(lobe.opacity) * 0.62),
+			Color(hue: hue(warmth), saturation: 0.72 + Double(profile.inheritanceWeight) * 0.16, brightness: 1).opacity(Double(lobe.opacity)),
+			Color(hue: hue(core), saturation: 0.32 + Double(profile.rhythmWeight) * 0.34, brightness: 1).opacity(Double(lobe.opacity) * 0.78),
+			Color.white.opacity(Double(lobe.opacity) * (0.14 + lobe.childWeight * 0.16)),
+		]
 	}
 
 	nonisolated private static func flamePath(
@@ -441,40 +430,41 @@ struct FractalFlareView: View {
 		profile: Profile,
 		time: TimeInterval
 	) {
-		let foldCount = max(7, min(15, profile.maxDepth + profile.connectionCount + 5))
+		let foldCount = max(9, min(30, 9 + profile.maxDepth + Int(profile.branchWeight * 8) + Int(profile.connectionWeight * 6)))
 		for index in 0..<foldCount {
 			let progress = CGFloat(index) / CGFloat(max(foldCount - 1, 1))
-			let seed = profile.signatures.isEmpty
-				? profile.seed
-				: profile.signatures[index % profile.signatures.count].seed
-			let side = progress - 0.5
-			let baseOffset = side * width * 0.28
-			let topOffset = sin(seed * .pi * 2 + CGFloat(time) * 0.42) * width * 0.22 + sway * width * 0.12
+			let signature = profile.signatures[index % profile.signatures.count]
+			let seed = signature.seed
+			let side = (signature.secondarySeed - 0.5) * (0.7 + profile.branchWeight * 0.7) + (progress - 0.5) * 0.3
+			let baseOffset = side * width * (0.18 + signature.childWeight * 0.14)
+			let topOffset = sin(seed * .pi * 2 + CGFloat(time) * (0.28 + signature.tertiarySeed * 0.3)) *
+				width * (0.16 + signature.metadata * 0.14) +
+				sway * width * 0.12
 			let top = CGPoint(
 				x: base.x + topOffset + fold * width * 0.08,
-				y: base.y - height * (0.68 + seed * 0.2)
+				y: base.y - height * (0.5 + signature.depth * 0.34 + seed * 0.12)
 			)
 			var ridge = Path()
 			ridge.move(to: CGPoint(x: base.x + baseOffset, y: base.y - height * 0.02))
 			ridge.addCurve(
 				to: top,
 				control1: CGPoint(
-					x: base.x + side * width * 0.72,
-					y: base.y - height * 0.22
+					x: base.x + side * width * (0.44 + signature.childWeight * 0.28),
+					y: base.y - height * (0.18 + signature.depth * 0.12)
 				),
 				control2: CGPoint(
-					x: base.x + topOffset - side * width * 0.28,
-					y: base.y - height * 0.48
+					x: base.x + topOffset - side * width * (0.18 + signature.inheritance * 0.16),
+					y: base.y - height * (0.38 + signature.depth * 0.18)
 				)
 			)
-			let warmth = Double(0.04 + seed * 0.08 + profile.metadataWeight * 0.05)
+			let warmth = profile.primaryHue + seed * 0.08 + profile.metadataWeight * 0.05
 			context.stroke(
 				ridge,
 				with: .linearGradient(
 					Gradient(colors: [
-						Color(hue: warmth, saturation: 0.62, brightness: 1).opacity(0.08),
-						Color.white.opacity(0.18 + Double(seed) * 0.08),
-						Color(hue: 0.92, saturation: 0.42, brightness: 1).opacity(0.04),
+						Color(hue: hue(warmth), saturation: 0.62, brightness: 1).opacity(0.06 + Double(signature.metadata) * 0.08),
+						Color.white.opacity(0.14 + Double(seed) * 0.13),
+						Color(hue: hue(profile.accentHue), saturation: 0.42, brightness: 1).opacity(0.04 + Double(signature.inheritance) * 0.06),
 					]),
 					startPoint: CGPoint(x: base.x, y: base.y),
 					endPoint: top
@@ -490,6 +480,30 @@ struct FractalFlareView: View {
 
 	private struct Signature {
 		var seed: CGFloat
+		var secondarySeed: CGFloat
+		var tertiarySeed: CGFloat
+		var depth: CGFloat
+		var childWeight: CGFloat
+		var inheritance: CGFloat
+		var metadata: CGFloat
+	}
+
+	private struct Lobe {
+		var seed: CGFloat
+		var side: CGFloat
+		var baseLift: CGFloat
+		var height: CGFloat
+		var width: CGFloat
+		var lean: CGFloat
+		var curl: CGFloat
+		var waist: CGFloat
+		var hueShift: CGFloat
+		var opacity: CGFloat
+		var blur: CGFloat
+		var motion: CGFloat
+		var phase: CGFloat
+		var metadata: CGFloat
+		var childWeight: CGFloat
 	}
 
 	private struct Profile {
@@ -497,51 +511,266 @@ struct FractalFlareView: View {
 		var inheritanceCount = 0
 		var connectionCount = 0
 		var metadataCount = 0
+		var leafCount = 0
+		var maxBreadth = 0
 		var maxDepth = 1
-		var seed: CGFloat
+		var totalDepth = 0
+		var characterCount = 0
+		var vowelCount = 0
+		var seed: CGFloat = 0
+		var paletteSeed: CGFloat = 0
+		var shapeSeed: CGFloat = 0
+		var motionSeed: CGFloat = 0
+		var foldSeed: CGFloat = 0
+		var horizontalBias: CGFloat = 0
 		var signatures: [Signature] = []
+		var lobes: [Lobe] = []
 
 		init(_ graph: Lexicon.Graph) {
-			seed = seedValue(for: graph.root.name)
+			var hasher = FlareHasher()
+			var sampled: [(priority: UInt64, signature: Signature)] = []
+			hasher.mix("mindflare-fractal-flame-v2")
+			hasher.mix(graph.root.name)
+
 			graph.root.traverse { id, _, node in
 				let depth = id.reduce(1) { depth, character in
 					character == "." ? depth + 1 : depth
 				}
+				let childCount = node.children.count
+				let inheritance = node.type.count + (node.protonym == nil ? 0 : 1)
+				let metadata = node.notes.count + node.comments.count + (node.defaultValue == nil ? 0 : 1)
+				var nodeHasher = FlareHasher()
+				nodeHasher.mix(id)
+				nodeHasher.mix(node.name)
+				nodeHasher.mix(depth)
+				nodeHasher.mix(childCount)
+				nodeHasher.mix(inheritance)
+				nodeHasher.mix(metadata)
+				for type in node.type.sorted() {
+					nodeHasher.mix(type)
+				}
+				if let protonym = node.protonym {
+					nodeHasher.mix(protonym)
+				}
+				for connection in node.connections.map(\.reference).sorted() {
+					nodeHasher.mix(connection)
+				}
+				for note in node.notes {
+					nodeHasher.mix(note)
+				}
+				for comment in node.comments {
+					nodeHasher.mix(comment)
+				}
+				if let defaultValue = node.defaultValue {
+					nodeHasher.mix(String(describing: defaultValue))
+				}
+				let nodeHash = nodeHasher.finalized()
+				hasher.mix(nodeHash)
+
 				nodeCount += 1
-				inheritanceCount += node.type.count + (node.protonym == nil ? 0 : 1)
+				inheritanceCount += inheritance
 				connectionCount += node.connections.count
-				metadataCount += node.notes.count + node.comments.count + (node.defaultValue == nil ? 0 : 1)
+				metadataCount += metadata
+				leafCount += childCount == 0 ? 1 : 0
+				maxBreadth = max(maxBreadth, childCount)
 				maxDepth = max(maxDepth, depth)
-				signatures.append(.init(seed: seedValue(for: id)))
+				totalDepth += depth
+				characterCount += node.name.unicodeScalars.count
+				vowelCount += node.name.unicodeScalars.reduce(0) { total, scalar in
+					"aeiouAEIOU".unicodeScalars.contains(scalar) ? total + 1 : total
+				}
+
+				let signature = Signature(
+					seed: Self.unit(nodeHash),
+					secondarySeed: Self.unit(nodeHash, shift: 16),
+					tertiarySeed: Self.unit(nodeHash, shift: 32),
+					depth: min(CGFloat(depth) / 18, 1),
+					childWeight: Self.logWeight(childCount, ceiling: 48),
+					inheritance: min(CGFloat(inheritance) / 4, 1),
+					metadata: min(CGFloat(metadata) / 4, 1)
+				)
+				let priority = Self.scramble(nodeHash &+ UInt64(nodeCount))
+				if sampled.count < 96 {
+					sampled.append((priority, signature))
+				} else if let index = sampled.indices.max(by: { sampled[$0].priority < sampled[$1].priority }) {
+					if priority < sampled[index].priority {
+						sampled[index] = (priority, signature)
+					}
+				}
 			}
+
+			let fingerprint = hasher.finalized()
+			seed = Self.unit(fingerprint)
+			paletteSeed = Self.unit(Self.scramble(fingerprint &+ 1))
+			shapeSeed = Self.unit(Self.scramble(fingerprint &+ 2))
+			motionSeed = Self.unit(Self.scramble(fingerprint &+ 3))
+			foldSeed = Self.unit(Self.scramble(fingerprint &+ 4))
+			horizontalBias = Self.unit(Self.scramble(fingerprint &+ 5))
+			signatures = sampled
+				.sorted { lhs, rhs in lhs.priority < rhs.priority }
+				.map(\.signature)
+			if signatures.isEmpty {
+				signatures = [
+					Signature(
+						seed: seed,
+						secondarySeed: shapeSeed,
+						tertiarySeed: paletteSeed,
+						depth: 0.2,
+						childWeight: 0.2,
+						inheritance: 0,
+						metadata: 0
+					)
+				]
+			}
+			lobes = Self.makeLobes(
+				signatures: signatures,
+				fingerprint: fingerprint,
+				depthWeight: depthWeight,
+				branchWeight: branchWeight,
+				inheritanceWeight: inheritanceWeight,
+				metadataWeight: metadataWeight
+			)
 		}
 
 		var nodeWeight: CGFloat {
-			min(CGFloat(nodeCount) / 80, 1)
+			Self.logWeight(nodeCount, ceiling: 50_000)
 		}
 
 		var inheritanceWeight: CGFloat {
-			min(CGFloat(inheritanceCount) / 28, 1)
+			ratio(inheritanceCount, to: nodeCount)
 		}
 
 		var connectionWeight: CGFloat {
-			min(CGFloat(connectionCount) / 12, 1)
+			min(ratio(connectionCount, to: nodeCount) * 4, 1)
 		}
 
 		var metadataWeight: CGFloat {
-			min(CGFloat(metadataCount) / 32, 1)
+			min(ratio(metadataCount, to: nodeCount) * 3, 1)
 		}
 
 		var depthWeight: CGFloat {
-			min(CGFloat(maxDepth) / 10, 1)
+			Self.logWeight(maxDepth, ceiling: 32)
+		}
+
+		var branchWeight: CGFloat {
+			Self.logWeight(maxBreadth, ceiling: 96)
+		}
+
+		var leafWeight: CGFloat {
+			ratio(leafCount, to: nodeCount)
+		}
+
+		var rhythmWeight: CGFloat {
+			ratio(vowelCount, to: characterCount)
+		}
+
+		var primaryHue: CGFloat {
+			0.015 + paletteSeed * 0.115
+		}
+
+		var accentHue: CGFloat {
+			0.82 + paletteSeed * 0.28 + rhythmWeight * 0.12
+		}
+
+		var coreHue: CGFloat {
+			0.075 + shapeSeed * 0.09
+		}
+
+		private func ratio(_ value: Int, to total: Int) -> CGFloat {
+			guard total > 0 else {
+				return 0
+			}
+			return min(CGFloat(value) / CGFloat(total), 1)
+		}
+
+		private static func makeLobes(
+			signatures: [Signature],
+			fingerprint: UInt64,
+			depthWeight: CGFloat,
+			branchWeight: CGFloat,
+			inheritanceWeight: CGFloat,
+			metadataWeight: CGFloat
+		) -> [Lobe] {
+			let count = 4 + Int(unit(scramble(fingerprint &+ 6)) * 5) + Int(depthWeight * 2)
+			return (0..<count).map { index in
+				let signature = signatures[index % signatures.count]
+				let sideDirection: CGFloat = index == 0 ? 0 : index.isMultiple(of: 2) ? 1 : -1
+				let sideMagnitude = index == 0 ? 0 : 0.14 + signature.secondarySeed * (0.3 + branchWeight * 0.28)
+				let heightBoost: CGFloat = index == 0 ? 0.42 : signature.depth * 0.3
+				return Lobe(
+					seed: signature.seed,
+					side: sideDirection * sideMagnitude + (signature.tertiarySeed - 0.5) * 0.14,
+					baseLift: index == 0 ? 0 : signature.childWeight * 0.08,
+					height: (index == 0 ? 0.98 : 0.44 + signature.seed * 0.38) + heightBoost + inheritanceWeight * 0.08,
+					width: (index == 0 ? 0.9 : 0.34 + signature.secondarySeed * 0.42) + branchWeight * 0.16,
+					lean: (signature.seed - 0.5) * 0.3,
+					curl: (signature.tertiarySeed - 0.5) * (0.32 + metadataWeight * 0.24),
+					waist: 0.22 + signature.childWeight * 0.28 + metadataWeight * 0.1,
+					hueShift: (signature.seed - 0.5) * 0.18 + signature.inheritance * 0.08,
+					opacity: index == 0 ? 0.76 : 0.28 + signature.tertiarySeed * 0.24 + signature.metadata * 0.12,
+					blur: index == 0 ? 0.006 : 0.002 + signature.seed * 0.004,
+					motion: 0.3 + signature.secondarySeed * 0.7,
+					phase: signature.tertiarySeed,
+					metadata: signature.metadata,
+					childWeight: signature.childWeight
+				)
+			}
+		}
+
+		private static func logWeight(_ value: Int, ceiling: CGFloat) -> CGFloat {
+			guard value > 0 else {
+				return 0
+			}
+			return min(log1p(CGFloat(value)) / log1p(ceiling), 1)
+		}
+
+		private static func unit(_ value: UInt64, shift: Int = 0) -> CGFloat {
+			CGFloat(Double((value >> shift) & 0xffff) / Double(UInt16.max))
+		}
+
+		private static func scramble(_ value: UInt64) -> UInt64 {
+			var result = value &+ 0x9e37_79b9_7f4a_7c15
+			result = (result ^ (result >> 30)) &* 0xbf58_476d_1ce4_e5b9
+			result = (result ^ (result >> 27)) &* 0x94d0_49bb_1331_11eb
+			return result ^ (result >> 31)
 		}
 	}
 
-	nonisolated private static func seedValue(for string: String) -> CGFloat {
-		let total = string.unicodeScalars.reduce(UInt32(0)) { result, scalar in
-			result &* 31 &+ scalar.value
+	private struct FlareHasher {
+		private var value: UInt64 = 0xcbf2_9ce4_8422_2325
+
+		mutating func mix(_ string: String) {
+			for byte in string.utf8 {
+				mix(byte)
+			}
+			mix(0xff)
 		}
-		return CGFloat(total % 997) / 997
+
+		mutating func mix(_ integer: Int) {
+			mix(UInt64(bitPattern: Int64(integer)))
+		}
+
+		mutating func mix(_ integer: UInt64) {
+			var value = integer
+			for _ in 0..<8 {
+				mix(UInt8(truncatingIfNeeded: value))
+				value >>= 8
+			}
+		}
+
+		mutating func finalized() -> UInt64 {
+			value
+		}
+
+		private mutating func mix(_ byte: UInt8) {
+			value ^= UInt64(byte)
+			value &*= 0x0000_0100_0000_01b3
+		}
+	}
+
+	nonisolated private static func hue(_ value: CGFloat) -> Double {
+		let remainder = value.truncatingRemainder(dividingBy: 1)
+		return Double(remainder >= 0 ? remainder : remainder + 1)
 	}
 }
 
@@ -803,6 +1032,16 @@ struct LexiconTreeFlareView: View {
 		.padding()
 }
 
+#Preview("Fractal flare range") {
+	HStack(spacing: 20) {
+		FractalFlareView(graph: FractalFlarePreview.storyGraph)
+			.frame(width: 220, height: 220)
+		FractalFlareView(graph: FractalFlarePreview.systemGraph)
+			.frame(width: 220, height: 220)
+	}
+	.padding()
+}
+
 #Preview("Tree flare") {
 	LexiconTreeFlareView(graph: FractalFlarePreview.graph)
 		.frame(width: 256, height: 256)
@@ -818,6 +1057,8 @@ struct LexiconTreeFlareView: View {
 
 private enum FractalFlarePreview {
 	static let graph = try! TaskPaper(source).decode()
+	static let storyGraph = try! TaskPaper(storySource).decode()
+	static let systemGraph = try! TaskPaper(systemSource).decode()
 
 	private static let source =
 		"mindflare:\n" +
@@ -843,5 +1084,54 @@ private enum FractalFlarePreview {
 		"\ttype:\n" +
 		"\t\tvisual:\n" +
 		"\t\tmetadata:"
+
+	private static let storySource =
+		"book:\n" +
+		"\tsentence:\n" +
+		"\t\tword:\n" +
+		"\t\t\tabout:\n" +
+		"\t\t\talice:\n" +
+		"\t\t\tgarden:\n" +
+		"\t\t\tmirror:\n" +
+		"\t\t\twonder:\n" +
+		"\t\tphrase:\n" +
+		"\t\t\tcurious:\n" +
+		"\t\t\tlittle:\n" +
+		"\t\t\trabbit:\n" +
+		"\tchapter:\n" +
+		"\t\topening:\n" +
+		"\t\tpool:\n" +
+		"\t\ttea:\n" +
+		"\t\ttrial:\n" +
+		"\tvoice:\n" +
+		"\t\twhisper:\n" +
+		"\t\tquestion:\n" +
+		"\t\tanswer:"
+
+	private static let systemSource =
+		"blockchain:\n" +
+		"\ttype:\n" +
+		"\t\tprimitive:\n" +
+		"\t\tentity:\n" +
+		"\t\toperation:\n" +
+		"\tcrypto:\n" +
+		"\t+ blockchain.type.primitive\n" +
+		"\t\thash:\n" +
+		"\t\tsignature:\n" +
+		"\tledger:\n" +
+		"\t+ blockchain.type.entity\n" +
+		"\t\tblock:\n" +
+		"\t\t+ blockchain.type.entity\n" +
+		"\t\t\theader:\n" +
+		"\t\t\ttransaction:\n" +
+		"\t\tconsensus:\n" +
+		"\t\t+ blockchain.type.operation\n" +
+		"\t\t\tvalidate:\n" +
+		"\t\t\tfinalize:\n" +
+		"\tnetwork:\n" +
+		"\t+ blockchain.type.entity\n" +
+		"\t\tpeer:\n" +
+		"\t\tmempool:\n" +
+		"\t\tgossip:"
 }
 #endif
