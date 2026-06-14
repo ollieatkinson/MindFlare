@@ -13,13 +13,13 @@ extension View {
 
 extension EnvironmentValues {
     
-    var window: Weak<NSWindow> {
-        get { self[NSWindowKey.self] }
-        set { self[NSWindowKey.self] = newValue }
+    var windowNumber: Int? {
+        get { self[NSWindowNumberKey.self] }
+        set { self[NSWindowNumberKey.self] = newValue }
     }
     
-    private struct NSWindowKey: EnvironmentKey {
-        static let defaultValue: Weak<NSWindow> = nil
+    private struct NSWindowNumberKey: EnvironmentKey {
+        static let defaultValue: Int? = nil
     }
 }
 
@@ -27,17 +27,17 @@ extension NSWindow {
     
     struct EnvironmentValue: ViewModifier {
         
-        @State private var window: Weak<NSWindow> = nil
+        @State private var windowNumber: Int?
         
         func body(content: Content) -> some View {
             content
-                .background(ViewRepresentable(binding: $window))
-                .environment(\.window, window)
+                .background(ViewRepresentable(binding: $windowNumber))
+                .environment(\.windowNumber, windowNumber)
         }
     }
 
     struct ViewRepresentable {
-        @Binding var binding: Weak<NSWindow>
+        @Binding var binding: Int?
     }
 }
 
@@ -57,7 +57,7 @@ extension NSWindow.ViewRepresentable: NSViewRepresentable {
 extension NSWindow.ViewRepresentable {
     
     struct Coordinator {
-        @Binding var binding: Weak<NSWindow>
+        @Binding var binding: Int?
     }
 
     class View: NSStackView {
@@ -80,7 +80,8 @@ extension NSWindow.ViewRepresentable {
         deinit { print("🗑", self) }
         
         override func viewWillMove(toWindow window: NSWindow?) {
-            coordinator.binding = Weak(window)
+            coordinator.binding = window?.windowNumber
+            window?.titlebarAppearsTransparent = true
         }
     }
 }

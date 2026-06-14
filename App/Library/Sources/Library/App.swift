@@ -6,7 +6,7 @@ import SwiftUI
 import Lexicon
 import LexiconGenerators
 
-@main struct MindFlareApp: App {
+public struct MindFlareApp: App {
 	
 	@NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
 	
@@ -28,13 +28,13 @@ import LexiconGenerators
 		}
 	}
 	
-	init() {
+	public init() {
 		launchCount += 1
 		bear.in(mind)
 		app.did.launch >> events
 	}
 	
-	var body: some Scene {
+	public var body: some Scene {
 		
 		// WindowGroup {
 		//     if documentCount < 1 {

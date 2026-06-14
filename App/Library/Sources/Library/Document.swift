@@ -8,8 +8,8 @@ import LexiconGenerators
 import Synchronization
 import UniformTypeIdentifiers
 
-final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDocument, CustomStringConvertible, @unchecked Sendable {
-	
+final class Document: Identifiable, ObservableObject, ReferenceFileDocument, CustomStringConvertible {
+
 	static func == (lhs: Document, rhs: Document) -> Bool {
 		lhs === rhs
 	}
@@ -28,8 +28,8 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 			return pendingGraph
 		})
 	}
-	
-	struct Snapshot: Equatable {
+
+	struct Snapshot: Equatable, Sendable {
 		struct Connection: Identifiable, Equatable, Sendable {
 			let path: Lemma.ID
 			let `import`: Lexicon.Import
@@ -223,22 +223,50 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 		}
 	}
 
+	struct Export: Sendable {
+		let generator: LexiconSourceGenerator
+		let json: Lexicon.Graph.JSON
+	}
+
+	private struct Storage: Sendable {
+		var snapshot: Snapshot
+		var export: Export?
+	}
+
 	static let readableContentTypes: [UTType] = [.lexicon, .taskpaper]
-	static let writableContentTypes: [UTType] = [.lexicon] + Lexicon.Graph.JSON.generators.values.map{ $0.utType }
+	static let writableContentTypes: [UTType] = [.lexicon] + Lexicon.Graph.JSON.generators.values.map { $0.utType }
 
 	private let filename: String?
-	
-	@Published private(set) var snapshot: Snapshot
-	@Published var isExporting = false
-	
-	var export: (generator: LexiconSourceGenerator, json: Lexicon.Graph.JSON)? {
-		didSet {
-			isExporting = export != nil
+	private let storage: Mutex<Storage>
+
+	@MainActor var export: Export? {
+		get {
+			storage.withLock { storage in
+				storage.export
+			}
+		}
+		set {
+			objectWillChange.send()
+			storage.withLock { storage in
+				storage.export = newValue
+			}
 		}
 	}
-    
-    var description: String {
-        if let name = filename, !name.isEmpty {
+
+	var isExporting: Bool {
+		storage.withLock { storage in
+			storage.export != nil
+		}
+	}
+
+	var snapshot: Snapshot {
+		storage.withLock { storage in
+			storage.snapshot
+		}
+	}
+
+	var description: String {
+		if let name = filename, !name.isEmpty {
 			if name.hasSuffix(".taskpaper") {
 				return String(name.dropLast(".taskpaper".count))
 			}
@@ -246,42 +274,51 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 				return String(name.dropLast(".lexicon".count))
 			}
 			else {
-                return name
-            }
-        } else {
-			return snapshot.graph.root.name
-        }
-    }
+				return name
+			}
+		} else {
+			return storage.withLock { storage in
+				storage.snapshot.graph.root.name
+			}
+		}
+	}
 
-    init(graph: Lexicon.Graph? = nil) {
+	init(graph: Lexicon.Graph? = nil) {
+		let snapshot = Snapshot(graph: graph ?? .init())
 		self.filename = nil
-		self.snapshot = Snapshot(graph: graph ?? .init())
-    }
-	
-	init(configuration: ReadConfiguration) throws {
-        
-        guard let data = configuration.file.regularFileContents else {
-            throw CocoaError(.fileReadCorruptFile)
-        }
-        
-        switch configuration.contentType {
-                
+		self.storage = Mutex(Storage(snapshot: snapshot, export: nil))
+	}
+
+	required init(configuration: ReadConfiguration) throws {
+
+		guard let data = configuration.file.regularFileContents else {
+			throw CocoaError(.fileReadCorruptFile)
+		}
+
+		let snapshot: Snapshot
+		let filename: String?
+
+		switch configuration.contentType {
+
 			case .lexicon, .taskpaper:
 				snapshot = try Snapshot(document: TaskPaper(data).decodeDocument())
-                filename = configuration.file.filename
-                
-            default:
-                throw CocoaError(.fileReadUnsupportedScheme)
-        }
-    }
-	
+				filename = configuration.file.filename
+
+			default:
+				throw CocoaError(.fileReadUnsupportedScheme)
+		}
+
+		self.filename = filename
+		self.storage = Mutex(Storage(snapshot: snapshot, export: nil))
+	}
+
 	@MainActor
 	func update(with new: Snapshot, undo manager: UndoManager?) {
-		
+
 		guard new != snapshot else {
 			return
 		}
-		
+
 		let old = Snapshot(
 			old: new.new,
 			new: new.old,
@@ -290,39 +327,46 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 			graph: snapshot.graph,
 			compositionDiagnostics: snapshot.compositionDiagnostics
 		)
-		self.snapshot = new
-		
+		objectWillChange.send()
+		storage.withLock { storage in
+			storage.snapshot = new
+		}
+
 		manager?.registerUndo(withTarget: self) { [old, manager] my in
 			my.update(with: old, undo: manager)
 		}
 	}
 
 	func snapshot(contentType: UTType) throws -> Snapshot {
-		snapshot
+		storage.withLock { storage in
+			storage.snapshot
+		}
 	}
-	
+
 	func fileWrapper(snapshot: Snapshot, configuration: WriteConfiguration) throws -> FileWrapper {
-        
+
         let data: Data
-        
+
         switch configuration.contentType {
-                
+
 			case .lexicon, .taskpaper:
 				data = try TaskPaper.encode(snapshot.document).data(using: .utf8).try()
-                
+
             default:
 				guard
-					let (generator, json) = export,
-					generator.utType == configuration.contentType
+					let export = storage.withLock({ storage in storage.export }),
+					export.generator.utType == configuration.contentType
 				else {
 					throw CocoaError(.fileWriteUnknown)
 				}
-				data = try generator.generate(json)
+				data = try export.generator.generate(export.json)
         }
-        
+
         return FileWrapper(regularFileWithContents: data)
-    }
+	}
 }
+
+extension Document: Equatable {}
 
 private struct SecurityScopedLexiconImportResolver: LexiconImportResolving {
 

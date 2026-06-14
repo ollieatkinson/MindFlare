@@ -3,3 +3,11 @@
 //
 
 import Library
+
+@main
+struct MindFlareApplication {
+
+	static func main() {
+		MindFlareApp.main()
+	}
+}

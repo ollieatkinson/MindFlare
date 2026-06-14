@@ -23,7 +23,7 @@ extension CLI {
     struct Events<A: L & I_app_ui_cli>: ViewModifier {
         
         @Environment(\.events) var events
-        @Environment(\.window) var window
+        @Environment(\.windowNumber) var windowNumber
 		@Environment(\.isSearching) var isSearching
 
         let cli: K<A>
@@ -34,7 +34,7 @@ extension CLI {
             content.onReceive(NSWindow.keyDown) { event in
                 
                 guard
-                    event.window === window.reference,
+                    event.windowNumber == windowNumber,
 					!isSearching,
                     isEnabled()
                 else {

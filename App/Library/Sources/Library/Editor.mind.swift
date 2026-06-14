@@ -187,7 +187,7 @@ extension Editor.Object {
 				return
 			}
 			let json = await my.cli.lemma.lexicon.json()
-			my.document.export = (generator, json)
+			my.document.export = Document.Export(generator: generator, json: json)
 		}
 	}
 

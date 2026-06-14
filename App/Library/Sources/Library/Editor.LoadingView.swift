@@ -11,8 +11,6 @@ extension Editor {
 		private static var count: UInt = 0
 		@State var id: UInt = { Self.count += 1; return Self.count }()
 		
-		@Environment(\.window) var window
-
 		@ObservedObject var document: Document
 
 		let fileURL: URL?
@@ -25,7 +23,14 @@ extension Editor {
 			
 			ZStack {
 				if let my = my {
-					Editor(document: document, isExporting: $document.isExporting)
+					Editor(document: document, isExporting: Binding(
+						get: { document.isExporting },
+						set: { isExporting in
+							if !isExporting {
+								document.export = nil
+							}
+						}
+					))
 						.as(my.doc.editor.view)
 						.environmentObject(my)
 						.focusedSceneValue(\FocusedValues.focusedDocumentID, id)
@@ -44,10 +49,6 @@ extension Editor {
 			
 			.background(NSColor.controlBackgroundColor.ui.opacity(0.9))
 			.transition(AnyTransition.opacity)
-			
-			.onChange(of: window) { _, window in
-				window.reference?.titlebarAppearsTransparent = true
-			}
 
 			.toolbar {
 				
