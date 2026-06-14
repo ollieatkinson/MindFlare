@@ -462,15 +462,23 @@ struct LexiconTreeFlareView: View {
 
 	let graph: Lexicon.Graph
 
+	@State private var profile: Profile?
+
 	var body: some View {
-		TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
-			Canvas(rendersAsynchronously: true) { context, size in
-				Self.draw(
-					graph: graph,
-					in: &context,
-					size: size,
-					time: timeline.date.timeIntervalSinceReferenceDate
-				)
+		GeometryReader { geometry in
+			if let profile {
+				TimelineView(.animation(minimumInterval: 1 / 30)) { timeline in
+					Rectangle()
+						.fill(.black)
+						.colorEffect(Self.shader(
+							profile: profile,
+							size: geometry.size,
+							time: timeline.date.timeIntervalSinceReferenceDate
+						))
+				}
+			} else {
+				Circle()
+					.fill(.black.opacity(0.96))
 			}
 		}
 		.aspectRatio(1, contentMode: .fit)
@@ -484,227 +492,187 @@ struct LexiconTreeFlareView: View {
 		}
 		.clipShape(Circle())
 		.accessibilityLabel("Animated Lexicon tree flare")
-	}
-
-	nonisolated private static func draw(
-		graph: Lexicon.Graph,
-		in context: inout GraphicsContext,
-		size: CGSize,
-		time: TimeInterval
-	) {
-		let profile = Profile(graph)
-		let scale = min(size.width, size.height)
-		let center = CGPoint(x: size.width * 0.5, y: size.height * 0.52)
-		let drift = CGFloat(sin(time * 0.42 + profile.seed * .pi * 2)) * 0.08
-
-		let glow = Path(ellipseIn: CGRect(
-			x: center.x - scale * (0.15 + profile.nodeWeight * 0.12),
-			y: center.y + scale * 0.16,
-			width: scale * (0.3 + profile.nodeWeight * 0.24),
-			height: scale * (0.12 + profile.inheritanceWeight * 0.12)
-		))
-		context.fill(
-			glow,
-			with: .radialGradient(
-				Gradient(colors: [
-					Color(hue: 0.02 + profile.seed * 0.04, saturation: 0.76, brightness: 1).opacity(0.48),
-					Color(hue: 0.12 + profile.inheritanceWeight * 0.12, saturation: 0.62, brightness: 1).opacity(0.16),
-					.clear,
-				]),
-				center: CGPoint(x: center.x, y: center.y + scale * 0.24),
-				startRadius: 0,
-				endRadius: scale * 0.32
-			)
-		)
-
-		var budget = 720
-		drawNode(
-			in: &context,
-			node: graph.root,
-			origin: CGPoint(x: center.x, y: center.y + scale * 0.24),
-			length: scale * (0.22 + profile.depthWeight * 0.08),
-			angle: -.pi / 2 + drift,
-			depth: 0,
-			maxDepth: max(5, min(12, profile.maxDepth + 3)),
-			time: time,
-			seed: profile.seed,
-			budget: &budget
-		)
-	}
-
-	nonisolated private static func drawNode(
-		in context: inout GraphicsContext,
-		node: Lexicon.Graph.Node,
-		origin: CGPoint,
-		length: CGFloat,
-		angle: CGFloat,
-		depth: Int,
-		maxDepth: Int,
-		time: TimeInterval,
-		seed: CGFloat,
-		budget: inout Int
-	) {
-		guard budget > 0, depth < maxDepth, length > 1 else {
-			return
-		}
-		budget -= 1
-
-		let end = CGPoint(
-			x: origin.x + cos(angle) * length,
-			y: origin.y + sin(angle) * length
-		)
-		var path = Path()
-		path.move(to: origin)
-		path.addQuadCurve(
-			to: end,
-			control: CGPoint(
-				x: (origin.x + end.x) * 0.5 + cos(angle + .pi / 2) * length * 0.12,
-				y: (origin.y + end.y) * 0.5 + sin(angle + .pi / 2) * length * 0.12
-			)
-		)
-
-		let progress = Double(depth) / Double(maxDepth)
-		let inherited = node.protonym == nil ? 0.0 : 1.0
-		let typed = min(Double(node.type.count) * 0.18, 0.54)
-		let hue = Double(seed) * 0.14 + 0.04 + progress * 0.08 + typed * 0.08 + inherited * 0.08
-		let color = Color(
-			hue: hue.truncatingRemainder(dividingBy: 1),
-			saturation: 0.54 + progress * 0.24 + typed,
-			brightness: 1
-		)
-		context.stroke(
-			path,
-			with: .color(color.opacity(0.2 + progress * 0.64)),
-			style: StrokeStyle(
-				lineWidth: max(0.8, length * (0.09 - CGFloat(progress) * 0.045)),
-				lineCap: .round,
-				lineJoin: .round
-			)
-		)
-
-		let children = selectedChildren(from: Array(node.children.values), limit: 7)
-		guard !children.isEmpty else {
-			drawTerminal(
-				in: &context,
-				node: node,
-				origin: end,
-				length: length,
-				angle: angle,
-				depth: depth,
-				maxDepth: maxDepth,
-				time: time,
-				seed: seed,
-				budget: &budget
-			)
-			return
-		}
-
-		let spread = min(CGFloat.pi * 0.82, 0.42 + CGFloat(children.count) * 0.14)
-		for (index, child) in children.enumerated() {
-			let childSeed = seedValue(for: child.name)
-			let position = children.count == 1
-				? CGFloat(sin(childSeed * .pi * 2)) * 0.16
-				: (CGFloat(index) / CGFloat(children.count - 1) - 0.5)
-			let sway = CGFloat(sin(time * 0.54 + childSeed * .pi * 2 + CGFloat(depth))) * 0.055
-			let inheritanceBend = child.protonym == nil ? 0 : CGFloat(0.09)
-			let typeBend = CGFloat(min(child.type.count, 5)) * 0.018
-			let childAngle = angle + position * spread + sway + inheritanceBend - typeBend
-			let childLength = length *
-				(0.58 + childSeed * 0.12) *
-				(children.count > 3 ? 0.9 : 1)
-
-			drawNode(
-				in: &context,
-				node: child,
-				origin: end,
-				length: childLength,
-				angle: childAngle,
-				depth: depth + 1,
-				maxDepth: maxDepth,
-				time: time,
-				seed: childSeed,
-				budget: &budget
-			)
+		.task(id: graph.date) {
+			let graph = graph
+			profile = await Task.detached(priority: .userInitiated) {
+				Profile(graph)
+			}.value
 		}
 	}
 
-	nonisolated private static func drawTerminal(
-		in context: inout GraphicsContext,
-		node: Lexicon.Graph.Node,
-		origin: CGPoint,
-		length: CGFloat,
-		angle: CGFloat,
-		depth: Int,
-		maxDepth: Int,
-		time: TimeInterval,
-		seed: CGFloat,
-		budget: inout Int
-	) {
-		guard depth + 1 < maxDepth, budget > 0 else {
-			return
-		}
-		let twigs = 1 + (node.type.isEmpty ? 0 : 1) + (node.protonym == nil ? 0 : 1)
-		for index in 0..<twigs {
-			let offset = CGFloat(index) - CGFloat(twigs - 1) / 2
-			let terminalNode = Lexicon.Graph.Node(name: "\(node.name)_terminal_\(index)")
-			drawNode(
-				in: &context,
-				node: terminalNode,
-				origin: origin,
-				length: length * (0.38 + seed * 0.08),
-				angle: angle + offset * 0.32 + CGFloat(sin(time + seed * 7)) * 0.04,
-				depth: depth + 1,
-				maxDepth: maxDepth,
-				time: time,
-				seed: seed + CGFloat(index) * 0.11,
-				budget: &budget
-			)
-		}
+	private static let shaderFunction = ShaderFunction(
+		library: .bundle(.module),
+		name: "mindFlareLexiconTree"
+	)
+
+	private static func shader(profile: Profile, size: CGSize, time: TimeInterval) -> Shader {
+		Shader(
+			function: shaderFunction,
+			arguments: [
+				.float2(Float(size.width), Float(size.height)),
+				.float(Float(time.truncatingRemainder(dividingBy: 10_000))),
+				.float4(Float(profile.seed), Float(profile.paletteSeed), Float(profile.shapeSeed), Float(profile.motionSeed)),
+				.float4(Float(profile.nodeWeight), Float(profile.depthWeight), Float(profile.branchWeight), Float(profile.leafWeight)),
+				.float4(Float(profile.inheritanceWeight), Float(profile.metadataWeight), Float(profile.connectionWeight), Float(profile.rhythmWeight)),
+				.float4(Float(profile.maxDepth), Float(profile.nodeCount), Float(profile.breadthSeed), 0),
+			]
+		)
 	}
 
-	nonisolated private static func selectedChildren(from children: [Lexicon.Graph.Node], limit: Int) -> [Lexicon.Graph.Node] {
-		guard children.count > limit, limit > 1 else {
-			return children
-		}
-		return (0..<limit).map { index in
-			children[Int((Double(index) / Double(limit - 1)) * Double(children.count - 1))]
-		}
-	}
-
-	nonisolated private static func seedValue(for string: String) -> CGFloat {
-		let total = string.unicodeScalars.reduce(UInt32(0)) { result, scalar in
-			result &* 31 &+ scalar.value
-		}
-		return CGFloat(total % 997) / 997
-	}
-
-	private struct Profile {
+	private struct Profile: Sendable {
 		var nodeCount = 0
 		var inheritanceCount = 0
+		var connectionCount = 0
+		var metadataCount = 0
+		var leafCount = 0
+		var maxBreadth = 0
 		var maxDepth = 1
-		var seed: CGFloat
+		var characterCount = 0
+		var vowelCount = 0
+		var seed: CGFloat = 0
+		var paletteSeed: CGFloat = 0
+		var shapeSeed: CGFloat = 0
+		var motionSeed: CGFloat = 0
+		var breadthSeed: CGFloat = 0
 
 		init(_ graph: Lexicon.Graph) {
-			seed = seedValue(for: graph.root.name)
+			var hasher = TreeHasher()
+			hasher.mix("mindflare-metal-tree-v1")
+			hasher.mix(graph.root.name)
 			graph.root.traverse { id, _, node in
+				let depth = id.reduce(1) { depth, character in
+					character == "." ? depth + 1 : depth
+				}
+				let childCount = node.children.count
+				let metadata = node.notes.count + node.comments.count + (node.defaultValue == nil ? 0 : 1)
+				var nodeHasher = TreeHasher()
+				nodeHasher.mix(id)
+				nodeHasher.mix(node.name)
+				nodeHasher.mix(depth)
+				nodeHasher.mix(childCount)
+				nodeHasher.mix(node.type.count)
+				nodeHasher.mix(node.connections.count)
+				nodeHasher.mix(metadata)
+				for type in node.type.sorted() {
+					nodeHasher.mix(type)
+				}
+				if let protonym = node.protonym {
+					nodeHasher.mix(protonym)
+				}
+				for connection in node.connections.map(\.reference).sorted() {
+					nodeHasher.mix(connection)
+				}
+				let nodeHash = nodeHasher.finalized()
+				hasher.mix(nodeHash)
+
 				nodeCount += 1
 				inheritanceCount += node.type.count
-				maxDepth = max(maxDepth, id.reduce(1) { depth, character in
-					character == "." ? depth + 1 : depth
-				})
+				connectionCount += node.connections.count
+				metadataCount += metadata
+				leafCount += childCount == 0 ? 1 : 0
+				maxBreadth = max(maxBreadth, childCount)
+				maxDepth = max(maxDepth, depth)
+				characterCount += node.name.unicodeScalars.count
+				vowelCount += node.name.unicodeScalars.reduce(0) { total, scalar in
+					"aeiouAEIOU".unicodeScalars.contains(scalar) ? total + 1 : total
+				}
 			}
+
+			let fingerprint = hasher.finalized()
+			seed = Self.unit(fingerprint)
+			paletteSeed = Self.unit(Self.scramble(fingerprint &+ 1))
+			shapeSeed = Self.unit(Self.scramble(fingerprint &+ 2))
+			motionSeed = Self.unit(Self.scramble(fingerprint &+ 3))
+			breadthSeed = Self.unit(Self.scramble(fingerprint &+ 4))
 		}
 
 		var nodeWeight: CGFloat {
-			min(CGFloat(nodeCount) / 80, 1)
+			Self.logWeight(nodeCount, ceiling: 50_000)
 		}
 
 		var inheritanceWeight: CGFloat {
-			min(CGFloat(inheritanceCount) / 28, 1)
+			min(ratio(inheritanceCount, to: nodeCount) * 4, 1)
+		}
+
+		var connectionWeight: CGFloat {
+			min(ratio(connectionCount, to: nodeCount) * 5, 1)
+		}
+
+		var metadataWeight: CGFloat {
+			min(ratio(metadataCount, to: nodeCount) * 4, 1)
 		}
 
 		var depthWeight: CGFloat {
-			min(CGFloat(maxDepth) / 10, 1)
+			Self.logWeight(maxDepth, ceiling: 32)
+		}
+
+		var branchWeight: CGFloat {
+			Self.logWeight(maxBreadth, ceiling: 96)
+		}
+
+		var leafWeight: CGFloat {
+			ratio(leafCount, to: nodeCount)
+		}
+
+		var rhythmWeight: CGFloat {
+			ratio(vowelCount, to: characterCount)
+		}
+
+		private func ratio(_ value: Int, to total: Int) -> CGFloat {
+			guard total > 0 else {
+				return 0
+			}
+			return min(CGFloat(value) / CGFloat(total), 1)
+		}
+
+		private static func logWeight(_ value: Int, ceiling: CGFloat) -> CGFloat {
+			guard value > 0 else {
+				return 0
+			}
+			return min(log1p(CGFloat(value)) / log1p(ceiling), 1)
+		}
+
+		private static func unit(_ value: UInt64, shift: Int = 0) -> CGFloat {
+			CGFloat(Double((value >> shift) & 0xffff) / Double(UInt16.max))
+		}
+
+		private static func scramble(_ value: UInt64) -> UInt64 {
+			var result = value &+ 0x9e37_79b9_7f4a_7c15
+			result = (result ^ (result >> 30)) &* 0xbf58_476d_1ce4_e5b9
+			result = (result ^ (result >> 27)) &* 0x94d0_49bb_1331_11eb
+			return result ^ (result >> 31)
+		}
+	}
+
+	private struct TreeHasher {
+		private var value: UInt64 = 0xcbf2_9ce4_8422_2325
+
+		mutating func mix(_ string: String) {
+			for byte in string.utf8 {
+				mix(byte)
+			}
+			mix(0xff)
+		}
+
+		mutating func mix(_ integer: Int) {
+			mix(UInt64(bitPattern: Int64(integer)))
+		}
+
+		mutating func mix(_ integer: UInt64) {
+			var value = integer
+			for _ in 0..<8 {
+				mix(UInt8(truncatingIfNeeded: value))
+				value >>= 8
+			}
+		}
+
+		mutating func finalized() -> UInt64 {
+			value
+		}
+
+		private mutating func mix(_ byte: UInt8) {
+			value ^= UInt64(byte)
+			value &*= 0x0000_0100_0000_01b3
 		}
 	}
 }
