@@ -30,6 +30,7 @@ extension Editor {
         @Environment(\.events) var events
 		
 		var document: Document
+		let fileURL: URL?
 		var focusedDocumentID: UInt?
 		
         lazy var then = mainContext { my in my.isFocused && my.isViewing }
@@ -49,15 +50,18 @@ extension Editor {
 					}
 					let cli = CLI.with(lemma: lemma)
 					let graph = lemma.lexicon.graph
-					let document = lemma.lexicon.document
+					let composed = lemma.lexicon.document
 					Task { @MainActor in
 						let old = self.cli
+						let source = self.snapshot.sourceDocument(updatingTo: composed, graph: graph)
 						self.cli = cli
 						self.snapshot = Document.Snapshot(
 							old: old.lemma.id,
 							new: lemma.id,
-							document: document,
-							graph: graph
+							document: source,
+							composed: composed,
+							graph: graph,
+							compositionDiagnostics: self.snapshot.compositionDiagnostics
 						)
 					}
                 }
@@ -96,16 +100,20 @@ extension Editor {
 			document: AnyCancellable?.none
 		)
 
-		init(id: UInt, document: Document) async {
+		init(id: UInt, document: Document, fileURL: URL?) async {
             
 			self.id = id
+			self.fileURL = fileURL
 			self.snapshot = document.snapshot
 			self.description = "\(Self.self) #\(id)"
 			
 			self.document = document
             
-			var lemma = await Self.root(for: document.snapshot)
-			if let id = document.snapshot.new, let o = await lemma.lexicon[id] {
+			let snapshot = Self.composedSnapshot(for: document.snapshot, fileURL: fileURL)
+			self.snapshot = snapshot
+
+			var lemma = await Self.root(for: snapshot)
+			if let id = snapshot.new, let o = await lemma.lexicon[id] {
 				lemma = o
 			}
 			cli = await CLI(lemma)
@@ -117,11 +125,11 @@ extension Editor {
         
         deinit {
             print("🗑 editor", cli.description, id)
-        }
+		}
 		
 		func revert(to snapshot: Document.Snapshot) {
-			Task { @LexiconActor [cli, back, forward] in
-				
+			let snapshot = Self.composedSnapshot(for: snapshot, fileURL: fileURL)
+			Task { @LexiconActor [cli, back, forward, snapshot] in
 				guard cli.lemma.lexicon.graph != snapshot.graph else {
 					return
 				}
@@ -148,8 +156,18 @@ extension Editor {
 
 extension Editor.Object {
 
+	nonisolated private static func composedSnapshot(for snapshot: Document.Snapshot, fileURL: URL?) -> Document.Snapshot {
+		do {
+			return try snapshot.composing(relativeTo: fileURL)
+		} catch {
+			var snapshot = snapshot
+			snapshot.compositionDiagnostics = [String(describing: error)]
+			return snapshot
+		}
+	}
+
 	@LexiconActor private static func root(for snapshot: Document.Snapshot) -> Lemma {
-		(try? Lexicon.from(snapshot.document).root) ?? Lexicon.from(snapshot.graph).root
+		(try? Lexicon.from(snapshot.composed).root) ?? Lexicon.from(snapshot.graph).root
 	}
 	
 	@LexiconActor static func backwards(cli: CLI, back: [Lemma.ID], forward: [Lemma.ID]) async -> (cli: CLI?, back: [Lemma.ID], forward: [Lemma.ID]) {

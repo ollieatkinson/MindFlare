@@ -17,38 +17,71 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 		var old: Lemma.ID?
 		var new: Lemma.ID?
 		var document: Lexicon.Document
+		var composed: Lexicon.Document
 		var graph: Lexicon.Graph
+		var compositionDiagnostics: [String]
 
 		init(
 			old: Lemma.ID? = nil,
 			new: Lemma.ID? = nil,
 			document: Lexicon.Document,
-			graph: Lexicon.Graph
+			composed: Lexicon.Document,
+			graph: Lexicon.Graph,
+			compositionDiagnostics: [String] = []
 		) {
 			self.old = old
 			self.new = new
 			self.document = document
+			self.composed = composed
 			self.graph = graph
+			self.compositionDiagnostics = compositionDiagnostics
 		}
 
 		init(old: Lemma.ID? = nil, new: Lemma.ID? = nil, graph: Lexicon.Graph) {
+			let document = Lexicon.Document(graph)
 			self.init(
 				old: old,
 				new: new,
-				document: Lexicon.Document(graph),
+				document: document,
+				composed: document,
 				graph: graph
 			)
 		}
 
 		init(document: Lexicon.Document) throws {
-			try self.init(document: document, graph: document.graph())
+			try self.init(document: document, composed: document, graph: document.graph())
 		}
 
 		static func == (lhs: Self, rhs: Self) -> Bool {
 			lhs.old == rhs.old &&
 			lhs.new == rhs.new &&
 			lhs.graph == rhs.graph &&
-			TaskPaper.encode(lhs.document) == TaskPaper.encode(rhs.document)
+			lhs.compositionDiagnostics == rhs.compositionDiagnostics &&
+			TaskPaper.encode(lhs.document) == TaskPaper.encode(rhs.document) &&
+			TaskPaper.encode(lhs.composed) == TaskPaper.encode(rhs.composed)
+		}
+
+		func composing(relativeTo sourceURL: URL?) throws -> Self {
+			guard let sourceURL else {
+				return self
+			}
+			let resolver = FileLexiconImportResolver(baseURL: sourceURL.deletingLastPathComponent())
+			let plan = try document.composed(resolving: resolver)
+			return try Self(
+				old: old,
+				new: new,
+				document: document,
+				composed: plan.document,
+				graph: plan.document.graph(root: graph.root.name),
+				compositionDiagnostics: plan.conflicts.map(\.description)
+			)
+		}
+
+		func sourceDocument(updatingTo composed: Lexicon.Document, graph: Lexicon.Graph) -> Lexicon.Document {
+			guard graph != self.graph else {
+				return document
+			}
+			return composed
 		}
 	}
 
@@ -114,7 +147,9 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 			old: new.new,
 			new: new.old,
 			document: snapshot.document,
-			graph: snapshot.graph
+			composed: snapshot.composed,
+			graph: snapshot.graph,
+			compositionDiagnostics: snapshot.compositionDiagnostics
 		)
 		self.snapshot = new
 		

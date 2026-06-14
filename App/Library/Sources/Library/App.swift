@@ -46,7 +46,7 @@ import LexiconGenerators
 		
 		DocumentGroup(newDocument: { Document(graph: self.graphFromPasteboard) }) { file in
 			
-			Editor.LoadingView(animated: $animated)
+			Editor.LoadingView(fileURL: file.fileURL, animated: $animated)
 			
 				.environment(\.focusedDocumentID, focusedDocumentID)
 				.onAppear { graphFromPasteboard = nil } // TODO: via NSDocumentController.shared.newDocument?

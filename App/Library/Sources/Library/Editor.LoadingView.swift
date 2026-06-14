@@ -14,7 +14,9 @@ extension Editor {
 		@Environment(\.window) var window
 		
 		@EnvironmentObject var document: Document
-		
+
+		let fileURL: URL?
+
 		@Binding var animated: Bool
 		
 		@State var my: Editor.Object?
@@ -33,7 +35,7 @@ extension Editor {
 			.as(app.document[id].view)
 			.environment(\.documentID, id)
             .task {
-                my = await Editor.Object(id: id, document: document)
+                my = await Editor.Object(id: id, document: document, fileURL: fileURL)
             }
 			.frame(
 				minWidth: 515, maxWidth: .infinity,

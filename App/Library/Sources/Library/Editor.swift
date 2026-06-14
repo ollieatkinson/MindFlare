@@ -23,6 +23,15 @@ struct Editor: View {
     var body: some View {
         
         VStack(alignment: .leading, spacing: 8) {
+			if !my.snapshot.compositionDiagnostics.isEmpty {
+				HStack(spacing: 6) {
+					Image(systemName: "exclamationmark.triangle.fill")
+					Text("\(my.snapshot.compositionDiagnostics.count) Lexicon composition issue\(my.snapshot.compositionDiagnostics.count == 1 ? "" : "s")")
+				}
+				.font(.caption)
+				.foregroundColor(.orange)
+				.help(my.snapshot.compositionDiagnostics.joined(separator: "\n"))
+			}
             CLIView(text: my.ui.text)
             ColumnsView(columns: my.ui.columns)
             PropertiesView(ui: my.ui.properties)
