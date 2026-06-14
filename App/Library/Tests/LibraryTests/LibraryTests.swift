@@ -111,4 +111,25 @@ final class LibraryTests: Hopes {
 			"runtime",
 		])
 	}
+
+	func testSnapshotReportsConnectionsCoveringSelectedPaths() throws {
+		let document = try TaskPaper("""
+			organization:
+				products:
+				@ ../Shared/products.lexicon
+					local_term:
+				engineering:
+				@ ./Imports/engineering.lexicon
+					local_term:
+			""").decodeDocument()
+
+		let snapshot = try Document.Snapshot(document: document)
+		let anchorConnections = snapshot.connections(covering: "organization.engineering")
+		let descendantConnections = snapshot.connections(covering: "organization.engineering.runtime")
+
+		XCTAssertEqual(anchorConnections.map(\.path), ["organization.engineering"])
+		XCTAssertEqual(anchorConnections.map(\.import.reference), ["./Imports/engineering.lexicon"])
+		XCTAssertEqual(anchorConnections.map(\.lexicon), ["engineering.lexicon"])
+		XCTAssertEqual(descendantConnections.map(\.path), ["organization.engineering"])
+	}
 }

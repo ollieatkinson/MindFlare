@@ -21,7 +21,10 @@ struct PropertiesView: View {
             if let protonym = ui.protonym {
 				Synonym(protonym: protonym, synonym: ui.cli.lemma)
             } else {
-                InheritanceList(ui: ui)
+				RelationshipList(
+					ui: ui,
+					connections: my.snapshot.connections(covering: ui.cli.lemma.id)
+				)
             }
         }
     }
@@ -82,19 +85,24 @@ struct Synonym: View {
     }
 }
 
-struct InheritanceList: View {
+struct RelationshipList: View {
     
     let ui: CLI.UI.Properties
+	let connections: [Document.Snapshot.Connection]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             
             ForEach(ui.type, id: \.self) { type in
-				Cell(type: type, lemma: ui.cli.lemma)
+				InheritanceCell(type: type, lemma: ui.cli.lemma)
+            }
+
+			ForEach(connections) { connection in
+				ConnectionCell(connection: connection, selectedPath: ui.cli.lemma.id)
             }
             
-            if ui.type.isEmpty {
-                Text("No inheritance")
+            if ui.type.isEmpty && connections.isEmpty {
+                Text("No inheritance or connections")
                     .propertyListRow()
                     .foregroundColor(Color(nsColor: .placeholderTextColor))
             }
@@ -103,9 +111,9 @@ struct InheritanceList: View {
     }
 }
 
-extension InheritanceList {
+extension RelationshipList {
     
-    struct Cell: View {
+    struct InheritanceCell: View {
         
         @Environment(\.events) var events
 		@Environment(\.documentID) var id
@@ -162,6 +170,50 @@ extension InheritanceList {
             }
         }
     }
+
+	struct ConnectionCell: View {
+
+		let connection: Document.Snapshot.Connection
+		let selectedPath: Lemma.ID
+
+		var body: some View {
+			HStack(spacing: 8) {
+				Image(systemName: "link")
+					.foregroundColor(Color(nsColor: .secondaryLabelColor))
+
+				VStack(alignment: .leading, spacing: 1) {
+					Text(connection.lexicon)
+						.lineLimit(1)
+
+					Text(pathDescription)
+						.font(.caption2)
+						.foregroundColor(Color(nsColor: .secondaryLabelColor))
+						.lineLimit(1)
+				}
+
+				Spacer()
+
+				Text(connection.import.location.rawValue.capitalized)
+					.font(.caption2)
+					.foregroundColor(Color(nsColor: .secondaryLabelColor))
+			}
+			.propertyListRow()
+			.foregroundColor(Color(nsColor: .textColor))
+			.background(Color(nsColor: .textBackgroundColor))
+			.cornerRadius(4)
+			.help("\(connection.import.reference) at \(connection.path)")
+		}
+
+		private var pathDescription: String {
+			guard
+				selectedPath != connection.path,
+				selectedPath.hasPrefix(connection.path + ".")
+			else {
+				return connection.path
+			}
+			return "\(connection.path) / \(String(selectedPath.dropFirst(connection.path.count + 1)))"
+		}
+	}
 }
 
 extension View {
@@ -183,9 +235,30 @@ extension PropertiesView {
 }
 
 #if DEBUG
-#Preview("Inheritance") {
+#Preview("Connected nodes") {
+	VStack(alignment: .leading, spacing: 1) {
+		RelationshipList.ConnectionCell(
+			connection: .init(path: "organization.engineering", import: .init("./Imports/engineering.lexicon")),
+			selectedPath: "organization.engineering"
+		)
+		RelationshipList.ConnectionCell(
+			connection: .init(path: "organization.products", import: .init("../Shared/products.lexicon")),
+			selectedPath: "organization.products.roadmap"
+		)
+	}
+	.frame(width: 420)
+	.padding()
+}
+
+#Preview("Relationships") {
 	MindFlarePreviewLoader { fixture in
-		InheritanceList(ui: fixture.editorUI.properties)
+		RelationshipList(
+			ui: fixture.editorUI.properties,
+			connections: [
+				.init(path: fixture.editorUI.cli.lemma.id, import: .init("./shared/editor.lexicon")),
+				.init(path: fixture.editorUI.cli.lemma.id, import: .init("./shared/commands.lexicon")),
+			]
+		)
 			.environment(\.documentID, fixture.editor.id)
 			.frame(width: 360)
 			.padding()

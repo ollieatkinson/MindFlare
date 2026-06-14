@@ -30,6 +30,31 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 	}
 	
 	struct Snapshot: Equatable {
+		struct Connection: Identifiable, Equatable, Sendable {
+			let path: Lemma.ID
+			let `import`: Lexicon.Import
+
+			var id: String {
+				"\(path)|\(`import`.reference)"
+			}
+
+			var lexicon: String {
+				switch `import`.location {
+					case .local:
+						let name = URL(fileURLWithPath: `import`.reference).lastPathComponent
+						return name.isEmpty ? `import`.reference : name
+					case .remote:
+						guard
+							let url = URL(string: `import`.reference),
+							let name = url.lastPathComponent.unlessEmpty
+						else {
+							return `import`.reference
+						}
+						return name
+				}
+			}
+		}
+
 		var old: Lemma.ID?
 		var new: Lemma.ID?
 		var document: Lexicon.Document
@@ -131,6 +156,34 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 				return document
 			}
 			return composed
+		}
+
+		func connections(covering id: Lemma.ID) -> [Connection] {
+			connections.filter { connection in
+				id == connection.path || id.hasPrefix(connection.path + ".")
+			}
+		}
+
+		private var connections: [Connection] {
+			var connections = [Connection]()
+
+			if let rootName = document.roots.keys.first {
+				for `import` in document.imports.sorted(by: { $0.reference < $1.reference }) {
+					connections.append(Connection(path: rootName, import: `import`))
+				}
+			}
+
+			for root in document.roots.values {
+				root.traverse { id, _, node in
+					for `import` in node.connections.sorted(by: { $0.reference < $1.reference }) {
+						connections.append(Connection(path: id, import: `import`))
+					}
+				}
+			}
+
+			return connections.sorted {
+				($0.path, $0.import.reference) < ($1.path, $1.import.reference)
+			}
 		}
 	}
 
