@@ -101,9 +101,52 @@ private enum StatsVisualization: String, Hashable {
 	case tree
 }
 
+enum FractalFlareDesign: Int, CaseIterable, Hashable, Identifiable {
+	case referencePlume
+	case neuralBloom
+	case emberVortex
+	case auroraFlame
+	case glassCandle
+	case synapseCrown
+	case braidedFlare
+	case solarPetal
+	case plasmaReactor
+	case rootFire
+
+	var id: Int {
+		rawValue
+	}
+
+	var title: String {
+		switch self {
+			case .referencePlume:
+				"Reference plume"
+			case .neuralBloom:
+				"Neural bloom"
+			case .emberVortex:
+				"Ember vortex"
+			case .auroraFlame:
+				"Aurora flame"
+			case .glassCandle:
+				"Glass candle"
+			case .synapseCrown:
+				"Synapse crown"
+			case .braidedFlare:
+				"Braided flare"
+			case .solarPetal:
+				"Solar petal"
+			case .plasmaReactor:
+				"Plasma reactor"
+			case .rootFire:
+				"Root fire"
+		}
+	}
+}
+
 struct FractalFlareView: View {
 
 	let graph: Lexicon.Graph
+	var design: FractalFlareDesign? = nil
 
 	@State private var profile: Profile?
 
@@ -116,7 +159,8 @@ struct FractalFlareView: View {
 						.colorEffect(Self.shader(
 							profile: profile,
 							size: geometry.size,
-							time: timeline.date.timeIntervalSinceReferenceDate
+							time: timeline.date.timeIntervalSinceReferenceDate,
+							design: design
 						))
 				}
 			} else {
@@ -148,8 +192,29 @@ struct FractalFlareView: View {
 		name: "mindFlareFractalFlame"
 	)
 
-	private static func shader(profile: Profile, size: CGSize, time: TimeInterval) -> Shader {
-		Shader(
+	private static let candidateShaderFunction = ShaderFunction(
+		library: .bundle(.module),
+		name: "mindFlareFractalCandidate"
+	)
+
+	private static func shader(profile: Profile, size: CGSize, time: TimeInterval, design: FractalFlareDesign?) -> Shader {
+		if let design {
+			return Shader(
+				function: candidateShaderFunction,
+				arguments: [
+					.float2(Float(size.width), Float(size.height)),
+					.float(Float((time * animationSpeed).truncatingRemainder(dividingBy: 10_000))),
+					.float4(Float(profile.seed), Float(profile.paletteSeed), Float(profile.shapeSeed), Float(profile.motionSeed)),
+					.float4(Float(profile.foldSeed), Float(profile.horizontalBias), Float(profile.nodeWeight), Float(profile.depthWeight)),
+					.float4(Float(profile.branchWeight), Float(profile.leafWeight), Float(profile.inheritanceWeight), Float(profile.metadataWeight)),
+					.float4(Float(profile.connectionWeight), Float(profile.rhythmWeight), Float(profile.primaryHue), Float(profile.accentHue)),
+					.float4(Float(profile.coreHue), Float(profile.lobeWeight), Float(profile.synonymWeight), Float(profile.nodeMass)),
+					.float(Float(design.rawValue)),
+				]
+			)
+		}
+
+		return Shader(
 			function: shaderFunction,
 			arguments: [
 				.float2(Float(size.width), Float(size.height)),
@@ -582,7 +647,41 @@ struct LexiconTreeFlareView: View {
 	}
 }
 
+private struct FractalFlareDesignGalleryView: View {
+
+	let graph: Lexicon.Graph
+
+	private let columns = Array(
+		repeating: GridItem(.fixed(164), spacing: 18, alignment: .top),
+		count: 5
+	)
+
+	var body: some View {
+		ScrollView {
+			LazyVGrid(columns: columns, spacing: 18) {
+				ForEach(FractalFlareDesign.allCases) { design in
+					VStack(spacing: 8) {
+						FractalFlareView(graph: graph, design: design)
+							.frame(width: 148, height: 148)
+						Text("\(design.rawValue + 1). \(design.title)")
+							.font(.caption)
+							.foregroundStyle(.secondary)
+							.lineLimit(1)
+					}
+					.frame(width: 164)
+				}
+			}
+			.padding(24)
+		}
+		.frame(width: 940, height: 460)
+	}
+}
+
 #if DEBUG
+#Preview("Fractal design gallery") {
+	FractalFlareDesignGalleryView(graph: FractalFlarePreview.systemGraph)
+}
+
 #Preview("Fractal flare") {
 	FractalFlareView(graph: FractalFlarePreview.graph)
 		.frame(width: 256, height: 256)
