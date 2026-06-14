@@ -26,7 +26,7 @@ extension NodeEditor {
             "\(Object.self):\(lemma)"
         }
         
-        @State var bear: Mind = []
+        var bear: Mind = []
         
         @Bear var mind: Mind {
             
@@ -73,26 +73,6 @@ struct NodeEditor: ViewModifier {
             .padding()
             .foregroundColor(nil)
             .background(NSColor.textBackgroundColor.ui.scaleEffect(2))
-        }
-        .onChange(of: name) { name in
-//            guard cli.lemma.name != name else {
-//                isValidName = true
-//                return
-//            }
-//            Task {
-//                isValidName = await cli.lemma.isValid(newName: name)
-//            }
-        }
-        .onChange(of: isPopped) { isPopped in
-            guard !isPopped else { return }
-//            guard cli.lemma.name != name else { return }
-//            Task {
-//                if isValidName, let lemma = await cli.lemma.rename(to: name) {
-//                    cli = await CLI(lemma)
-//                } else {
-//                    self.name = cli.lemma.name
-//                }
-//            }
         }
     }
 }

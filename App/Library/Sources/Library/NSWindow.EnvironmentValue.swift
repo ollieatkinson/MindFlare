@@ -65,7 +65,7 @@ extension NSWindow.ViewRepresentable {
         let coordinator: Coordinator
         
         override var description: String {
-            "NSStackView/NSWindow.ViewRepresentable: \(coordinator.binding.reference?.windowNumber ?? 0)"
+            "NSStackView/NSWindow.ViewRepresentable"
         }
 
         required init?(coder: NSCoder) {
@@ -123,4 +123,3 @@ private final class KeyEventInterpreter: NSStackView {
         textView.interpretKeyEvents(eventArray)
     }
 }
-

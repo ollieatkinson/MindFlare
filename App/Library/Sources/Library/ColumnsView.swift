@@ -28,7 +28,7 @@ struct ColumnsView: View {
                     }
                 }
             }
-            .onChange(of: columns.last) { column in
+            .onChange(of: columns.last) { _, column in
                 withAnimation {
                     p.scrollTo(column?.id)
                 }
@@ -61,7 +61,7 @@ struct ColumnView: View {
                 .frame(maxWidth: .infinity)
                 
             }
-            .onChange(of: ui) { ui in
+            .onChange(of: ui) { _, ui in
                 withAnimation {
                     p.scrollTo(ui.selectedRow)
                 }
@@ -210,12 +210,12 @@ struct ColumnCell: View {
                     my.uiContext = .viewing
                 }
         }
-        .onChange(of: ui.isInheriting) { isPopping in
+        .onChange(of: ui.isInheriting) { _, isPopping in
             Task { @MainActor in
                 browser = isPopping ? await Browser.Object(parent: my) : nil
             }
         }
-        .onChange(of: ui.isSearchingProtonym) { isPopping in
+        .onChange(of: ui.isSearchingProtonym) { _, isPopping in
             Task { @MainActor in
                 browser = isPopping ? await Browser.Object(parent: my) : nil
             }

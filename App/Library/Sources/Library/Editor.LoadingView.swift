@@ -12,8 +12,8 @@ extension Editor {
 		@State var id: UInt = { Self.count += 1; return Self.count }()
 		
 		@Environment(\.window) var window
-		
-		@EnvironmentObject var document: Document
+
+		@ObservedObject var document: Document
 
 		let fileURL: URL?
 
@@ -45,7 +45,7 @@ extension Editor {
 			.background(NSColor.controlBackgroundColor.ui.opacity(0.9))
 			.transition(AnyTransition.opacity)
 			
-			.onChange(of: window) { window in
+			.onChange(of: window) { _, window in
 				window.reference?.titlebarAppearsTransparent = true
 			}
 

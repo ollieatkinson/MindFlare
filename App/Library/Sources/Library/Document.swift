@@ -5,12 +5,28 @@
 import SwiftUI
 import Lexicon
 import LexiconGenerators
+import Synchronization
 import UniformTypeIdentifiers
 
-final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDocument, CustomStringConvertible {
+final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDocument, CustomStringConvertible, @unchecked Sendable {
 	
 	static func == (lhs: Document, rhs: Document) -> Bool {
 		lhs === rhs
+	}
+
+	private static let pendingGraph = Mutex<Lexicon.Graph?>(nil)
+
+	static func prepareNewDocument(graph: Lexicon.Graph?) {
+		pendingGraph.withLock { pendingGraph in
+			pendingGraph = graph
+		}
+	}
+
+	static func newDocument() -> Document {
+		Document(graph: pendingGraph.withLock { pendingGraph in
+			defer { pendingGraph = nil }
+			return pendingGraph
+		})
 	}
 	
 	struct Snapshot: Equatable {
@@ -88,7 +104,7 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 	static let readableContentTypes: [UTType] = [.lexicon, .taskpaper]
 	static let writableContentTypes: [UTType] = [.lexicon] + Lexicon.Graph.JSON.generators.values.map{ $0.utType }
 
-	let file: FileWrapper?
+	private let filename: String?
 	
 	@Published private(set) var snapshot: Snapshot
 	@Published var isExporting = false
@@ -100,7 +116,7 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
 	}
     
     var description: String {
-        if let name = file?.filename, !name.isEmpty {
+        if let name = filename, !name.isEmpty {
 			if name.hasSuffix(".taskpaper") {
 				return String(name.dropLast(".taskpaper".count))
 			}
@@ -116,7 +132,7 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
     }
 
     init(graph: Lexicon.Graph? = nil) {
-		self.file = nil
+		self.filename = nil
 		self.snapshot = Snapshot(graph: graph ?? .init())
     }
 	
@@ -130,13 +146,14 @@ final class Document: Identifiable, Equatable, ObservableObject, ReferenceFileDo
                 
 			case .lexicon, .taskpaper:
 				snapshot = try Snapshot(document: TaskPaper(data).decodeDocument())
-                file = configuration.file
+                filename = configuration.file.filename
                 
             default:
                 throw CocoaError(.fileReadUnsupportedScheme)
         }
     }
 	
+	@MainActor
 	func update(with new: Snapshot, undo manager: UndoManager?) {
 		
 		guard new != snapshot else {

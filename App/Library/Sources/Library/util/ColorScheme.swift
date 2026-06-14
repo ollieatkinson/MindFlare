@@ -14,7 +14,7 @@ extension ColorScheme {
         }
     }
     
-    func appearance(inverse: Bool) -> NSAppearance {
+    @MainActor func appearance(inverse: Bool) -> NSAppearance {
         let name: NSAppearance.Name
         switch self {
             case .light: name = inverse ? .darkAqua : .aqua

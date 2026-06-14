@@ -59,7 +59,7 @@ import SwiftUI
 			Task { @MainActor [weak self] in
 				guard let self = self else { return }
 				self.store[cacheKey] = suggestions
-				try Task.checkCancellation()
+				guard !Task.isCancelled else { return }
 				guard query == self.query.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
 				self.suggestions = suggestions
 			}

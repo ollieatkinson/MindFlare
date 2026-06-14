@@ -17,7 +17,6 @@ import LexiconGenerators
 	
 	@FocusedValue(\.focusedDocumentID) var focusedDocumentID
 	
-	@State var graphFromPasteboard: Lexicon.Graph?
 	@State var documentCount = 0
 	
 	var bear: Mind = [] // TODO: @State and where to +=
@@ -44,12 +43,11 @@ import LexiconGenerators
 		//     }
 		// }
 		
-		DocumentGroup(newDocument: { Document(graph: self.graphFromPasteboard) }) { file in
+		DocumentGroup(newDocument: Document.newDocument) { file in
 			
-			Editor.LoadingView(fileURL: file.fileURL, animated: $animated)
+			Editor.LoadingView(document: file.document, fileURL: file.fileURL, animated: $animated)
 			
 				.environment(\.focusedDocumentID, focusedDocumentID)
-				.onAppear { graphFromPasteboard = nil } // TODO: via NSDocumentController.shared.newDocument?
 			
 				.environment(\.animated, animated)
 			
@@ -72,7 +70,7 @@ import LexiconGenerators
 						if documentCount == 0, launchCount == 1 {
 							do {
 								let graph = try "Hello.lexicon".file().string().graph()
-								self.graphFromPasteboard = graph
+								Document.prepareNewDocument(graph: graph)
 								NSDocumentController.shared.newDocument(nil)
 							} catch {
 								print("😱", error)
@@ -96,7 +94,7 @@ import LexiconGenerators
 					ForEach(examples, id: \.self) { example in
 						Button(example) {
 							do {
-								graphFromPasteboard = try "\(example).lexicon".file().string().graph()
+								Document.prepareNewDocument(graph: try "\(example).lexicon".file().string().graph())
 								NSDocumentController.shared.newDocument(nil)
 							} catch {
 								assertionFailure("\(error)")
@@ -115,7 +113,7 @@ import LexiconGenerators
 					else {
 						return
 					}
-					self.graphFromPasteboard = graph
+					Document.prepareNewDocument(graph: graph)
 					NSDocumentController.shared.newDocument(nil)
 				}
 				.keyboardShortcut("n", modifiers: [.shift, .command])
@@ -128,7 +126,7 @@ import LexiconGenerators
 						else {
 							return
 						}
-						self.graphFromPasteboard = Lexicon.Graph.from(sentences: string, root: "a")
+						Document.prepareNewDocument(graph: Lexicon.Graph.from(sentences: string, root: "a"))
 						NSDocumentController.shared.newDocument(nil)
 					}
 				}

@@ -67,7 +67,7 @@ struct Searchable<A: L & I_app_ui_search>: ViewModifier {
         let search: K<A>
         
         func body(content: Content) -> some View {
-            content.onChange(of: isSearching) { isSearching in
+            content.onChange(of: isSearching) { _, isSearching in
                 if isSearching {
                     search.did.start >> events
                 } else {

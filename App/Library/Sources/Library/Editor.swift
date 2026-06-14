@@ -50,19 +50,19 @@ struct Editor: View {
             defaultFilename: document.description
         ) { _ in }
 		
-		.onChange(of: document) { document in
+		.onChange(of: document) { _, document in
 			my.document = document
 		}
 		
-		.onChange(of: document.snapshot) { snapshot in
+		.onChange(of: document.snapshot) { _, snapshot in
 			my.revert(to: snapshot)
 		}
 		
-		.onChange(of: my.snapshot) { snapshot in
+		.onChange(of: my.snapshot) { _, snapshot in
 			document.update(with: snapshot, undo: undoManager)
 		}
 
-		.onChange(of: focusedDocumentID) { focusedDocumentID in
+		.onChange(of: focusedDocumentID) { _, focusedDocumentID in
 			my.focusedDocumentID = focusedDocumentID
 		}
 
