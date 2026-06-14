@@ -153,7 +153,7 @@ struct FractalFlareView: View {
 			function: shaderFunction,
 			arguments: [
 				.float2(Float(size.width), Float(size.height)),
-				.float(Float(time.truncatingRemainder(dividingBy: 10_000))),
+				.float(Float((time * animationSpeed).truncatingRemainder(dividingBy: 10_000))),
 				.float4(Float(profile.seed), Float(profile.paletteSeed), Float(profile.shapeSeed), Float(profile.motionSeed)),
 				.float4(Float(profile.foldSeed), Float(profile.horizontalBias), Float(profile.nodeWeight), Float(profile.depthWeight)),
 				.float4(Float(profile.branchWeight), Float(profile.leafWeight), Float(profile.inheritanceWeight), Float(profile.metadataWeight)),
@@ -163,33 +163,7 @@ struct FractalFlareView: View {
 		)
 	}
 
-	private struct Signature: Sendable {
-		var seed: CGFloat
-		var secondarySeed: CGFloat
-		var tertiarySeed: CGFloat
-		var depth: CGFloat
-		var childWeight: CGFloat
-		var inheritance: CGFloat
-		var metadata: CGFloat
-	}
-
-	private struct Lobe: Sendable {
-		var seed: CGFloat
-		var side: CGFloat
-		var baseLift: CGFloat
-		var height: CGFloat
-		var width: CGFloat
-		var lean: CGFloat
-		var curl: CGFloat
-		var waist: CGFloat
-		var hueShift: CGFloat
-		var opacity: CGFloat
-		var blur: CGFloat
-		var motion: CGFloat
-		var phase: CGFloat
-		var metadata: CGFloat
-		var childWeight: CGFloat
-	}
+	private static let animationSpeed = 2.35
 
 	private struct Profile: Sendable {
 		var nodeCount = 0
@@ -209,12 +183,9 @@ struct FractalFlareView: View {
 		var motionSeed: CGFloat = 0
 		var foldSeed: CGFloat = 0
 		var horizontalBias: CGFloat = 0
-		var signatures: [Signature] = []
-		var lobes: [Lobe] = []
 
 		init(_ graph: Lexicon.Graph) {
 			var hasher = FlareHasher()
-			var sampled: [(priority: UInt64, signature: Signature)] = []
 			hasher.mix("mindflare-fractal-flame-v2")
 			hasher.mix(graph.root.name)
 
@@ -266,24 +237,6 @@ struct FractalFlareView: View {
 				vowelCount += node.name.unicodeScalars.reduce(0) { total, scalar in
 					"aeiouAEIOU".unicodeScalars.contains(scalar) ? total + 1 : total
 				}
-
-				let signature = Signature(
-					seed: Self.unit(nodeHash),
-					secondarySeed: Self.unit(nodeHash, shift: 16),
-					tertiarySeed: Self.unit(nodeHash, shift: 32),
-					depth: min(CGFloat(depth) / 18, 1),
-					childWeight: Self.logWeight(childCount, ceiling: 48),
-					inheritance: min(CGFloat(inheritance) / 4, 1),
-					metadata: min(CGFloat(metadata) / 4, 1)
-				)
-				let priority = Self.scramble(nodeHash &+ UInt64(nodeCount))
-				if sampled.count < 96 {
-					sampled.append((priority, signature))
-				} else if let index = sampled.indices.max(by: { sampled[$0].priority < sampled[$1].priority }) {
-					if priority < sampled[index].priority {
-						sampled[index] = (priority, signature)
-					}
-				}
 			}
 
 			let fingerprint = hasher.finalized()
@@ -293,30 +246,6 @@ struct FractalFlareView: View {
 			motionSeed = Self.unit(Self.scramble(fingerprint &+ 3))
 			foldSeed = Self.unit(Self.scramble(fingerprint &+ 4))
 			horizontalBias = Self.unit(Self.scramble(fingerprint &+ 5))
-			signatures = sampled
-				.sorted { lhs, rhs in lhs.priority < rhs.priority }
-				.map(\.signature)
-			if signatures.isEmpty {
-				signatures = [
-					Signature(
-						seed: seed,
-						secondarySeed: shapeSeed,
-						tertiarySeed: paletteSeed,
-						depth: 0.2,
-						childWeight: 0.2,
-						inheritance: 0,
-						metadata: 0
-					)
-				]
-			}
-			lobes = Self.makeLobes(
-				signatures: signatures,
-				fingerprint: fingerprint,
-				depthWeight: depthWeight,
-				branchWeight: branchWeight,
-				inheritanceWeight: inheritanceWeight,
-				metadataWeight: metadataWeight
-			)
 		}
 
 		var nodeWeight: CGFloat {
@@ -360,7 +289,7 @@ struct FractalFlareView: View {
 		}
 
 		var lobeWeight: CGFloat {
-			min(CGFloat(lobes.count) / 12, 1)
+			min(branchWeight * 0.55 + connectionWeight * 0.25 + synonymWeight * 0.2, 1)
 		}
 
 		var primaryHue: CGFloat {
@@ -380,40 +309,6 @@ struct FractalFlareView: View {
 				return 0
 			}
 			return min(CGFloat(value) / CGFloat(total), 1)
-		}
-
-		private static func makeLobes(
-			signatures: [Signature],
-			fingerprint: UInt64,
-			depthWeight: CGFloat,
-			branchWeight: CGFloat,
-			inheritanceWeight: CGFloat,
-			metadataWeight: CGFloat
-		) -> [Lobe] {
-			let count = 4 + Int(unit(scramble(fingerprint &+ 6)) * 5) + Int(depthWeight * 2)
-			return (0..<count).map { index in
-				let signature = signatures[index % signatures.count]
-				let sideDirection: CGFloat = index == 0 ? 0 : index.isMultiple(of: 2) ? 1 : -1
-				let sideMagnitude = index == 0 ? 0 : 0.14 + signature.secondarySeed * (0.3 + branchWeight * 0.28)
-				let heightBoost: CGFloat = index == 0 ? 0.42 : signature.depth * 0.3
-				return Lobe(
-					seed: signature.seed,
-					side: sideDirection * sideMagnitude + (signature.tertiarySeed - 0.5) * 0.14,
-					baseLift: index == 0 ? 0 : signature.childWeight * 0.08,
-					height: (index == 0 ? 0.98 : 0.44 + signature.seed * 0.38) + heightBoost + inheritanceWeight * 0.08,
-					width: (index == 0 ? 0.9 : 0.34 + signature.secondarySeed * 0.42) + branchWeight * 0.16,
-					lean: (signature.seed - 0.5) * 0.3,
-					curl: (signature.tertiarySeed - 0.5) * (0.32 + metadataWeight * 0.24),
-					waist: 0.22 + signature.childWeight * 0.28 + metadataWeight * 0.1,
-					hueShift: (signature.seed - 0.5) * 0.18 + signature.inheritance * 0.08,
-					opacity: index == 0 ? 0.76 : 0.28 + signature.tertiarySeed * 0.24 + signature.metadata * 0.12,
-					blur: index == 0 ? 0.006 : 0.002 + signature.seed * 0.004,
-					motion: 0.3 + signature.secondarySeed * 0.7,
-					phase: signature.tertiarySeed,
-					metadata: signature.metadata,
-					childWeight: signature.childWeight
-				)
-			}
 		}
 
 		private static func logWeight(_ value: Int, ceiling: CGFloat) -> CGFloat {

@@ -93,108 +93,86 @@ static float segmentGlow(float2 point, float2 start, float2 end, float width) {
 	float nodeMass = profile4.w;
 
 	float2 dimensions = max(size, float2(1.0));
-	float2 screenUV = position / dimensions;
-	float2 shaderUV = float2(screenUV.x, 1.0 - screenUV.y);
-	float2 centered = shaderUV - float2(0.5);
+	float2 uv = float2(position.x / dimensions.x, 1.0 - position.y / dimensions.y);
+	float2 centered = uv - float2(0.5);
 	centered.y /= dimensions.x / dimensions.y;
-	float2 centerUV = centered;
 
 	float countWeight = max(nodeWeight, nodeMass);
-	float styledNodeWeight = mix(0.64, countWeight, 0.42);
-	float styledDepthWeight = mix(0.72, depthWeight, 0.42);
-	float styledBranchWeight = mix(0.42, branchWeight, 0.35);
-	float styledLeafWeight = mix(0.36, leafWeight, 0.28);
-	float styledInheritanceWeight = mix(0.38, inheritanceWeight, 0.4);
-	float styledMetadataWeight = mix(0.24, metadataWeight, 0.38);
-	float styledConnectionWeight = mix(0.2, connectionWeight, 0.42);
-	float styledRhythmWeight = mix(0.32, rhythmWeight, 0.32);
-	float styledSynonymWeight = mix(0.08, synonymWeight, 0.7);
-	float styledLobeWeight = mix(0.52, lobeWeight + synonymWeight * 0.35, 0.3);
+	float flameCount = floor(1.0 + clamp(synonymWeight * 3.2 + connectionWeight * 1.8 + lobeWeight * 1.4, 0.0, 5.0));
+	float flowSpeed = 0.24 + motionSeed * 0.11 + connectionWeight * 0.07 + rhythmWeight * 0.05;
+	float heightNoise = flareFBM(float2(time * 0.3 + seed * 8.0, shapeSeed * 12.0), foldSeed);
+	float flameHeight = clamp(0.62 + heightNoise * 0.18 + depthWeight * 0.08 + countWeight * 0.08, 0.56, 0.94);
+	float2 offset = float2(seed * 17.0 + paletteSeed * 6.0, -time * flowSpeed);
 
-	float flameMultiplicity = clamp(styledSynonymWeight * 0.45 + styledInheritanceWeight * 0.3 + styledLobeWeight * 0.25, 0.0, 1.0);
-	float flameSpeed = 0.11 + motionSeed * 0.06 + styledConnectionWeight * 0.05 + styledSynonymWeight * 0.035;
-	float heightVariation = flareFBM(float2(time * 0.28, seed * 5.1 + shapeSeed), foldSeed) *
-		(0.18 + styledDepthWeight * 0.14 + countWeight * 0.04);
-	float2 flowOffset = float2(seed * 8.0 + paletteSeed * 3.0, -time * flameSpeed);
-	float turbulence = flareFBM(centered * (1.7 + styledBranchWeight * 0.9 + styledSynonymWeight * 0.35) + flowOffset, seed + foldSeed);
-	float distance = max(0.085, length(centered));
+	float turbulence = flareFBM(centered * (0.85 + metadataWeight * 0.42) + offset, seed + foldSeed);
+	float distance = max(0.08, length(centered));
 	float twist = ((turbulence - 0.5) / distance) *
-		smoothstep(-0.25, 0.42, shaderUV.y) *
-		(0.18 + styledMetadataWeight * 0.09 + styledConnectionWeight * 0.07 + styledInheritanceWeight * 0.05);
-	float2 warped = flareRotate(centered, twist);
+		smoothstep(-0.2, 0.4, uv.y) *
+		(0.38 + inheritanceWeight * 0.16 + connectionWeight * 0.12);
+	float2 warped = centered + flareRotate(centered, twist) * (0.36 + branchWeight * 0.08);
 
-	float risingNoise = flareFBM(
-		float2(warped.x * (2.2 + styledLobeWeight), shaderUV.y * 2.5) + flowOffset * 0.75,
-		paletteSeed + motionSeed
-	);
-	float lean = (horizontalBias - 0.5) * 0.1 +
-		sin(time * (0.46 + motionSeed * 0.16) + seed * M_PI_F * 2.0) * (0.018 + styledConnectionWeight * 0.02);
-	float centerLine = lean * smoothstep(0.08, 0.95, shaderUV.y) +
-		(risingNoise - 0.5) * (0.07 + styledMetadataWeight * 0.035) * smoothstep(0.12, 0.82, shaderUV.y);
-	float taper = mix(1.04, 0.34 + styledLeafWeight * 0.1, smoothstep(0.08, 0.9, shaderUV.y));
-	float body = 1.12 + styledNodeWeight * 0.08 - abs(warped.x - centerLine) * (3.05 + styledBranchWeight * 0.85) / max(taper, 0.1);
+	float lean = (horizontalBias - 0.5) * 0.12 +
+		sin(time * (0.48 + motionSeed * 0.25) + seed * M_PI_F * 2.0) * (0.025 + connectionWeight * 0.02);
+	float centerline = lean * pow(uv.y, 0.65) +
+		sin(uv.y * (4.3 + shapeSeed * 2.2) + time * (0.58 + motionSeed * 0.24) + seed * M_PI_F * 2.0) *
+			(0.018 + inheritanceWeight * 0.018 + metadataWeight * 0.012) *
+			smoothstep(0.06, 0.82, uv.y);
+	centerline += (turbulence - 0.5) * (0.035 + metadataWeight * 0.03) * smoothstep(0.08, 0.92, uv.y);
 
-	float flameHeight = 0.44 + heightVariation + styledDepthWeight * 0.05 + countWeight * 0.025;
-	body *= smoothstep(0.0, 0.09, shaderUV.y);
-	body *= smoothstep(flameHeight, flameHeight - 0.24, shaderUV.y);
-	body += (risingNoise - 0.5) * 0.11 * smoothstep(0.12, 0.8, shaderUV.y);
+	float normalizedY = clamp(uv.y / max(flameHeight, 0.001), 0.0, 1.0);
+	float baseWidth = 0.17 + countWeight * 0.04 + branchWeight * 0.025;
+	float tipWidth = 0.018 + synonymWeight * 0.014 + leafWeight * 0.012;
+	float width = mix(baseWidth, tipWidth, pow(normalizedY, 0.82));
+	width *= 1.0 + (turbulence - 0.5) * (0.26 + inheritanceWeight * 0.18);
+	width = max(width, 0.012);
 
-	float visibleFlames = floor(1.0 + flameMultiplicity * 4.0);
-	for (int index = 0; index < 4; index += 1) {
-		float enabled = step(float(index) + 1.0, visibleFlames);
+	float verticalGate = smoothstep(0.0, 0.08, uv.y) * smoothstep(flameHeight, flameHeight - 0.16, uv.y);
+	float body = clamp(1.0 - abs(warped.x - centerline) / width, 0.0, 1.0) * verticalGate;
+	float flame = pow(body, 1.7);
+	float core = pow(clamp(1.0 - abs(warped.x - centerline) / max(width * 0.45, 0.006), 0.0, 1.0) * verticalGate, 3.2);
+
+	for (int index = 1; index < 6; index += 1) {
+		float enabled = step(float(index), flameCount);
 		float side = index % 2 == 0 ? -1.0 : 1.0;
-		float tier = floor(float(index) * 0.5);
-		float tongueSeed = flareHash(seed * 19.0 + float(index) * 3.7 + synonymWeight * 5.0);
-		float tongueRise = smoothstep(0.18 + tier * 0.06, 0.52 + tier * 0.08, shaderUV.y);
-		float tongueFade = smoothstep(flameHeight - 0.02, flameHeight - 0.23, shaderUV.y);
-		float tongueCenter = centerLine +
-			side * (0.035 + styledSynonymWeight * 0.055 + tier * 0.018) * tongueRise +
-			sin(time * (0.38 + tongueSeed * 0.18) + tongueSeed * M_PI_F * 2.0) * 0.018 * tongueRise;
-		float tongueTaper = max(taper * (0.55 - tier * 0.08), 0.1);
-		float tongue = 0.72 - abs(warped.x - tongueCenter) * (5.4 + styledBranchWeight * 1.25) / tongueTaper;
-		tongue *= tongueRise * tongueFade * enabled * (0.18 + styledInheritanceWeight * 0.12 + styledSynonymWeight * 0.12);
-		body += max(tongue, 0.0);
+		float tongueSeed = flareHash(seed * 23.0 + float(index) * 7.1 + synonymWeight * 9.0);
+		float rise = smoothstep(0.12, 0.72, uv.y);
+		float localHeight = flameHeight * (0.72 + tongueSeed * 0.22 + depthWeight * 0.08);
+		float localGate = smoothstep(0.04, 0.14, uv.y) * smoothstep(localHeight, localHeight - 0.14, uv.y);
+		float localCenter = centerline +
+			side * (0.052 + synonymWeight * 0.07 + branchWeight * 0.025 + tongueSeed * 0.035) * rise +
+			sin(time * (0.7 + tongueSeed * 0.45) + uv.y * 7.0 + tongueSeed * 6.28) * 0.018 * rise;
+		float localWidth = width * (0.44 + tongueSeed * 0.24 + connectionWeight * 0.12);
+		float tongue = clamp(1.0 - abs(warped.x - localCenter) / max(localWidth, 0.008), 0.0, 1.0) * localGate;
+		flame = max(flame, pow(tongue, 2.1) * enabled * (0.48 + inheritanceWeight * 0.18 + synonymWeight * 0.14));
+		core = max(core, pow(tongue, 4.0) * enabled * 0.34);
 	}
 
-	float flame = smoothstep(0.02, 0.98, body);
-	flame = pow(flame, 2.15 + styledLobeWeight * 0.36);
-	flame /= max(smoothstep(1.04, -0.08, shaderUV.y), 0.16);
-	flame = clamp(flame, 0.0, 1.0);
-
-	float blueBase = pow(clamp(flame * 0.92, 0.0, 1.0), 13.0);
-	blueBase *= smoothstep(0.22, 0.02, shaderUV.y);
-	blueBase /= max(abs(warped.x - centerLine) * 5.5, 0.35);
+	float blueBase = pow(clamp(body * 0.95, 0.0, 1.0), 8.0);
+	blueBase *= smoothstep(0.2, 0.0, uv.y);
+	blueBase /= max(abs((warped.x - centerline) * 2.0), 0.34);
 	blueBase = clamp(blueBase, 0.0, 1.0);
 
-	float hotCore = pow(flame, 3.1 - countWeight * 0.18) * smoothstep(0.02, 0.52, shaderUV.y);
-	float emberEdge = pow(flame, 0.62) * (1.0 - hotCore * 0.38);
-	float warmHue = mix(0.035 + paletteSeed * 0.04 + styledRhythmWeight * 0.012, primaryHue, 0.08);
-	float redHue = mix(0.0 + foldSeed * 0.025, accentHue, 0.04);
-	float coreHueResolved = mix(0.095 + shapeSeed * 0.025, coreHue, 0.06);
+	float redHue = mix(0.012 + foldSeed * 0.018, accentHue, 0.035);
+	float amberHue = mix(0.075 + paletteSeed * 0.025 + rhythmWeight * 0.01, primaryHue, 0.05);
+	float whiteHue = mix(0.095 + shapeSeed * 0.018, coreHue, 0.05);
+	float3 ember = flareHSV(redHue, 0.94, 1.0);
+	float3 amber = flareHSV(amberHue, 0.86, 1.0);
+	float3 white = mix(flareHSV(whiteHue, 0.22, 1.0), float3(1.0, 0.98, 0.78), 0.76);
+	float intensity = clamp(flame + core * 0.8, 0.0, 1.0);
+	float3 flameColor = mix(ember, amber, smoothstep(0.04, 0.48, intensity));
+	flameColor = mix(flameColor, white, smoothstep(0.38, 1.0, core + flame * 0.18));
+	flameColor = mix(flameColor, flareHSV(0.62, 0.72, 0.95), blueBase * 0.35);
+	flameColor *= (flame * 0.86 + core * 0.62) * (0.92 + countWeight * 0.18 + inheritanceWeight * 0.08);
 
-	float3 ember = flareHSV(redHue, 0.95, 0.95) * emberEdge;
-	float3 gold = flareHSV(warmHue + 0.045, 0.8, 1.0);
-	float3 whiteHot = mix(flareHSV(coreHueResolved, 0.36, 1.0), float3(1.0), 0.58);
-	float intensity = 0.72 + countWeight * 0.18 + styledInheritanceWeight * 0.1 + styledSynonymWeight * 0.08;
-	float3 flameColor = mix(ember, gold, smoothstep(0.0, 0.82, flame));
-	flameColor = mix(flameColor, whiteHot, hotCore * 0.48);
-	flameColor = mix(flareHSV(0.62 + styledConnectionWeight * 0.05, 0.75, 1.0), flameColor, 0.94 + styledLeafWeight * 0.04 * (1.0 - blueBase));
-	flameColor = mix(flameColor, flareHSV(0.62, 0.72, 0.85), blueBase * 0.28);
-	flameColor *= flame * intensity;
-
-	float haloNoise = flareFBM(float2(time * 0.035 + seed, paletteSeed * 5.0), shapeSeed);
-	float haloSize = 0.48 + styledDepthWeight * 0.08 + countWeight * 0.08 + styledInheritanceWeight * 0.04;
-	float haloDistance = length(centerUV + float2(lean * 0.2, 0.1));
+	float haloNoise = flareFBM(float2(time * 0.06 + seed, paletteSeed * 5.0), shapeSeed);
+	float haloSize = 0.47 + depthWeight * 0.08 + countWeight * 0.07;
+	float haloDistance = length(centered + float2(-lean * 0.18, 0.12));
 	float halo = clamp(1.0 - haloDistance / haloSize, 0.0, 1.0);
-	halo = pow(halo, 1.35) * (0.2 + haloNoise * 0.2 + countWeight * 0.04 + styledSynonymWeight * 0.03);
-	float3 haloColor = flareHSV(redHue + 0.015, 0.78, 0.78) * halo;
+	halo = pow(halo, 1.35) * (0.14 + haloNoise * 0.18 + metadataWeight * 0.06);
+	float3 haloColor = flareHSV(redHue + 0.012, 0.82, 0.78) * halo;
 
-	float sparkle = mix(
-		flareHash2(warped * dimensions.x + time),
-		1.0,
-		0.92
-	);
-	float3 color = (haloColor + flameColor) * sparkle;
+	float grain = mix(flareHash2(position + float2(time * 23.0 + seed * 31.0, foldSeed * 19.0)), 1.0, 0.94);
+	float3 color = (haloColor + flameColor) * grain;
 	color = clamp(color, 0.0, 1.0);
 	return half4(half3(color), sourceColor.a);
 }
