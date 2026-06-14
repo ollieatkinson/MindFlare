@@ -158,7 +158,7 @@ struct FractalFlareView: View {
 				.float4(Float(profile.foldSeed), Float(profile.horizontalBias), Float(profile.nodeWeight), Float(profile.depthWeight)),
 				.float4(Float(profile.branchWeight), Float(profile.leafWeight), Float(profile.inheritanceWeight), Float(profile.metadataWeight)),
 				.float4(Float(profile.connectionWeight), Float(profile.rhythmWeight), Float(profile.primaryHue), Float(profile.accentHue)),
-				.float4(Float(profile.coreHue), Float(profile.lobeWeight), Float(profile.maxDepth), Float(profile.nodeCount)),
+				.float4(Float(profile.coreHue), Float(profile.lobeWeight), Float(profile.synonymWeight), Float(profile.nodeMass)),
 			]
 		)
 	}
@@ -193,6 +193,7 @@ struct FractalFlareView: View {
 
 	private struct Profile: Sendable {
 		var nodeCount = 0
+		var synonymCount = 0
 		var inheritanceCount = 0
 		var connectionCount = 0
 		var metadataCount = 0
@@ -253,6 +254,7 @@ struct FractalFlareView: View {
 				hasher.mix(nodeHash)
 
 				nodeCount += 1
+				synonymCount += node.protonym == nil ? 0 : 1
 				inheritanceCount += inheritance
 				connectionCount += node.connections.count
 				metadataCount += metadata
@@ -319,6 +321,14 @@ struct FractalFlareView: View {
 
 		var nodeWeight: CGFloat {
 			Self.logWeight(nodeCount, ceiling: 50_000)
+		}
+
+		var nodeMass: CGFloat {
+			Self.logWeight(nodeCount, ceiling: 100_000)
+		}
+
+		var synonymWeight: CGFloat {
+			Self.logWeight(synonymCount, ceiling: 10_000)
 		}
 
 		var inheritanceWeight: CGFloat {
