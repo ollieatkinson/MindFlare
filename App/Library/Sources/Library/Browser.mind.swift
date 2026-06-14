@@ -95,16 +95,11 @@ extension Browser.Object {
 
 		doc.browser.cli.select.next >> then { my, event in
 			if my.cli.input.isEmpty {
-				let lemma = my.cli.lemma
-				let cli = await my.cli.backspaced()
-				let a = cli.suggestions
-				guard a.count > 1, let i = a.firstIndex(of: lemma) else {
+				let cli = await my.cli.selectingSibling(offset: 1)
+				guard cli.lemma.id != my.cli.lemma.id else {
 					return
 				}
-				guard let lemma = a.cycled().dropFirst(i + 1).first(where: { _ in true }) else {
-					return
-				}
-				my.cli = await my.cli.reseting(to: lemma)
+				my.cli = cli
 			} else {
 				my.cli.selectNext(cycle: true)
 			}
@@ -112,16 +107,11 @@ extension Browser.Object {
 
 		doc.browser.cli.select.previous >> then { my, event in
 			if my.cli.input.isEmpty {
-				let lemma = my.cli.lemma
-				let cli = await my.cli.backspaced()
-				let a = cli.suggestions
-				guard a.count > 1, let i = a.firstIndex(of: lemma) else {
+				let cli = await my.cli.selectingSibling(offset: -1)
+				guard cli.lemma.id != my.cli.lemma.id else {
 					return
 				}
-				guard let lemma = a.cycled().dropFirst(i + a.count - 1).first(where: { _ in true }) else {
-					return
-				}
-				my.cli = await my.cli.reseting(to: lemma)
+				my.cli = cli
 			} else {
 				my.cli.selectPrevious(cycle: true)
 			}

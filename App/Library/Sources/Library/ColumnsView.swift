@@ -28,21 +28,24 @@ struct ColumnsView: View {
 					}
 				}
 			}
-			.onChange(of: columns.last) { _, column in
-				withAnimation {
-					p.scrollTo(column?.id)
-				}
+			.onChange(of: columns.last?.id) { _, id in
+				scroll(to: id, with: p)
 			}
 			.onAppear {
-				withAnimation {
-					p.scrollTo(columns.last?.id)
-				}
+				scroll(to: columns.last?.id, with: p)
 			}
 		}
 
 		.frame(maxWidth: .infinity, maxHeight: .infinity)
 		.background(NSColor.textBackgroundColor.ui)
 		.roundedBorder()
+	}
+
+	private func scroll(to id: CLI.UI.Column.ID?, with proxy: ScrollViewProxy) {
+		guard let id else {
+			return
+		}
+		proxy.scrollTo(id, anchor: .trailing)
 	}
 }
 
@@ -61,17 +64,20 @@ struct ColumnView: View {
 				.frame(maxWidth: .infinity)
 
 			}
-			.onChange(of: ui) { _, ui in
-				withAnimation {
-					p.scrollTo(ui.selectedRow)
-				}
+			.onChange(of: ui.selectedRow) { _, selectedRow in
+				scroll(to: selectedRow, with: p)
 			}
 			.onAppear {
-				withAnimation {
-					p.scrollTo(ui.selectedRow)
-				}
+				scroll(to: ui.selectedRow, with: p)
 			}
 		}
+	}
+
+	private func scroll(to selectedRow: Lemma.ID?, with proxy: ScrollViewProxy) {
+		guard let selectedRow else {
+			return
+		}
+		proxy.scrollTo(selectedRow, anchor: .center)
 	}
 }
 

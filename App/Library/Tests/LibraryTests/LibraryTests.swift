@@ -252,6 +252,45 @@ final class LibraryTests: Hopes {
 		)
 	}
 
+	func testEmptyInputSiblingSelectionClimbsToNearestVisibleLevelWithChoices() async throws {
+		let root = await Self.historyRoot()
+		let current = try await root.lexicon["root.b.only"].try()
+		let cli = await CLI(current)
+
+		let next = await cli.selectingSibling(offset: 1)
+		let previous = await cli.selectingSibling(offset: -1)
+
+		XCTAssertEqual(next.lemma.id, "root.c")
+		XCTAssertEqual(previous.lemma.id, "root.a")
+		XCTAssertEqual(next.root.id, "root")
+	}
+
+	func testEmptyInputSiblingSelectionRespectsNestedBrowserRoot() async throws {
+		let root = await Self.historyRoot()
+		let browserRoot = try await root.lexicon["root.b"].try()
+		let current = try await root.lexicon["root.b.only"].try()
+		let cli = await CLI(current, root: browserRoot)
+
+		let next = await cli.selectingSibling(offset: 1)
+		let previous = await cli.selectingSibling(offset: -1)
+
+		XCTAssertEqual(next.lemma.id, "root.b.only")
+		XCTAssertEqual(previous.lemma.id, "root.b.only")
+		XCTAssertEqual(next.root.id, "root.b")
+	}
+
+	func testEmptyInputSiblingSelectionHandlesLargeSiblingLists() async throws {
+		let root = await Self.largeSiblingRoot(count: 1_500)
+		let current = try await root.lexicon["root.n_0500"].try()
+		let cli = await CLI(current)
+
+		let next = await cli.selectingSibling(offset: 1)
+		let previous = await cli.selectingSibling(offset: -1)
+
+		XCTAssertEqual(next.lemma.id, "root.n_0501")
+		XCTAssertEqual(previous.lemma.id, "root.n_0499")
+	}
+
 	func testHistoryBackwardsKeepsForwardStack() async throws {
 		let root = await Self.historyRoot()
 		let current = try await root.lexicon["root.b"].try()
@@ -291,12 +330,37 @@ final class LibraryTests: Hopes {
 					name: "root",
 					children: [
 						"a": Lexicon.Graph.Node(name: "a"),
-						"b": Lexicon.Graph.Node(name: "b"),
+						"b": Lexicon.Graph.Node(
+							name: "b",
+							children: [
+								"only": Lexicon.Graph.Node(name: "only"),
+							]
+						),
 						"c": Lexicon.Graph.Node(name: "c"),
 					]
 				)
 			)
 		)
 		.root
+	}
+
+	@LexiconActor private static func largeSiblingRoot(count: Int) -> Lemma {
+		Lexicon.from(
+			Lexicon.Graph(
+				root: Lexicon.Graph.Node(
+					name: "root",
+					children: Dictionary(uniqueKeysWithValues: (0..<count).map { index in
+						let name = zeroPaddedName(index)
+						return (name, Lexicon.Graph.Node(name: name))
+					})
+				)
+			)
+		)
+		.root
+	}
+
+	private static func zeroPaddedName(_ index: Int) -> String {
+		let value = String(index)
+		return "n_" + String(repeating: "0", count: max(0, 4 - value.count)) + value
 	}
 }
