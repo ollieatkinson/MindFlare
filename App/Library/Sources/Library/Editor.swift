@@ -25,6 +25,7 @@ struct Editor: View {
 		VStack(alignment: .leading, spacing: 8) {
 			CompositionDiagnosticsView(
 				diagnostics: my.snapshot.compositionDiagnostics,
+				accessRequest: my.pendingImportAccessRequest,
 				grantFolderAccess: my.pendingImportAccessRequest == nil && my.fileURL == nil ? nil : {
 					my.grantImportFolderAccess()
 				}
@@ -33,7 +34,7 @@ struct Editor: View {
 			ColumnsView(columns: my.ui.columns)
 			PropertiesView(ui: my.ui.properties)
 		}
-			.cliEvents(for: my.doc.browser.cli, while: { my.uiContext != .renaming })
+		.cliEvents(for: my.doc.browser.cli, while: { my.uiContext != .renaming })
 		.searchable(my.doc.editor.search, in: Binding(get: { my.cli.lemma.lexicon }, set: { _ in }))
 
 		.animation(animated ? .default : nil, value: my.cli)
@@ -72,6 +73,7 @@ struct Editor: View {
 struct CompositionDiagnosticsView: View {
 
 	let diagnostics: [String]
+	let accessRequest: SecurityScopedImportAccess.Request?
 	let grantFolderAccess: (() -> Void)?
 
 	var body: some View {
@@ -95,13 +97,10 @@ struct CompositionDiagnosticsView: View {
 				}
 
 				if let grantFolderAccess {
-					Button {
-						grantFolderAccess()
-					} label: {
-						Label("Grant Folder Access", systemImage: "folder.badge.gearshape")
-					}
-					.buttonStyle(.borderless)
-					.help("Allow MindFlare to read imported Lexicon files")
+					ImportAccessRecoveryView(
+						request: accessRequest,
+						grantFolderAccess: grantFolderAccess
+					)
 				}
 			}
 			.font(.caption)
@@ -111,13 +110,63 @@ struct CompositionDiagnosticsView: View {
 	}
 }
 
+private struct ImportAccessRecoveryView: View {
+
+	let request: SecurityScopedImportAccess.Request?
+	let grantFolderAccess: () -> Void
+
+	var body: some View {
+		HStack(alignment: .center, spacing: 8) {
+			Image(systemName: "folder.badge.gearshape")
+				.imageScale(.medium)
+
+			VStack(alignment: .leading, spacing: 1) {
+				Text(request?.permissionTitle ?? "Lexicon import access needed")
+					.fontWeight(.semibold)
+				Text(request?.permissionDetail ?? "Choose the folder that contains this Lexicon and its imported files.")
+					.foregroundStyle(.secondary)
+					.lineLimit(2)
+			}
+
+			Spacer(minLength: 12)
+
+			Button {
+				grantFolderAccess()
+			} label: {
+				Label("Grant Access", systemImage: "lock.open")
+			}
+			.buttonStyle(.borderedProminent)
+			.controlSize(.small)
+			.tint(.orange)
+			.help(request?.permissionHelp ?? "Allow MindFlare to read imported Lexicon files")
+		}
+		.padding(.top, 3)
+	}
+}
+
 #if DEBUG
 #Preview("Composition diagnostics") {
 	CompositionDiagnosticsView(diagnostics: [
 		"Could not resolve local Lexicon import for organization.products. MindFlare resolves local imports relative to /Users/example/Vocabulary. Check that the referenced .lexicon file exists and that macOS granted access to its containing folder.",
 		"Conflicting default values at app.document.editor: true and false. Move the shared value into one imported lexicon or make the local override explicit.",
-	], grantFolderAccess: {})
+	], accessRequest: nil, grantFolderAccess: {})
 	.padding()
 	.frame(width: 520, alignment: .leading)
+}
+
+#Preview("Import permission recovery") {
+	CompositionDiagnosticsView(
+		diagnostics: [
+			"Could not compose Lexicon imports for commerce.lexicon: MindFlare needs permission to read imported Lexicon file \"shared-commerce.lexicon\". Grant access to /Users/example/Lexicons, or to a parent folder that contains all related Lexicon files.",
+		],
+		accessRequest: SecurityScopedImportAccess.Request(
+			fileURL: URL(fileURLWithPath: "/Users/example/Lexicons/shared-commerce.lexicon"),
+			importReference: "./shared-commerce.lexicon",
+			underlyingDescription: "The file could not be opened because you do not have permission to view it."
+		),
+		grantFolderAccess: {}
+	)
+	.padding()
+	.frame(width: 760, alignment: .leading)
 }
 #endif

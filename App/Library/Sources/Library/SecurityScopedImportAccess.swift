@@ -14,16 +14,40 @@ enum SecurityScopedImportAccess {
 		let importReference: String
 		let underlyingDescription: String
 
+		var id: String {
+			"\(fileURL.path)|\(importReference)"
+		}
+
+		var fileName: String {
+			fileURL.lastPathComponent
+		}
+
 		var folderURL: URL {
 			fileURL.deletingLastPathComponent()
 		}
 
+		var folderPath: String {
+			folderURL.path
+		}
+
+		var permissionTitle: String {
+			"Permission needed for \(fileName)"
+		}
+
+		var permissionDetail: String {
+			"Choose \(folderPath), or a parent folder that contains all related Lexicon files."
+		}
+
+		var permissionHelp: String {
+			"Allow MindFlare to read \(fileName) and any related imported Lexicon files."
+		}
+
 		var errorDescription: String? {
-			"MindFlare needs permission to read imported Lexicon file \"\(fileURL.lastPathComponent)\"."
+			"MindFlare needs permission to read imported Lexicon file \"\(fileName)\"."
 		}
 
 		var recoverySuggestion: String? {
-			"Grant access to \(folderURL.path), or to a parent folder that contains all related Lexicon files."
+			"Grant access to \(folderPath), or to a parent folder that contains all related Lexicon files."
 		}
 
 		func diagnosticDescription(sourceURL: URL?) -> String {
@@ -98,7 +122,7 @@ enum SecurityScopedImportAccess {
 			defaultingTo: request.folderURL,
 			requiredFileURL: request.fileURL,
 			message: "MindFlare needs access to an imported Lexicon file.",
-			informativeText: "Grant access to the folder containing \(request.fileURL.lastPathComponent), or to a parent folder that contains the related Lexicon files."
+			informativeText: request.permissionDetail
 		)
 	}
 
@@ -121,7 +145,7 @@ enum SecurityScopedImportAccess {
 	) -> Bool {
 		let panel = NSOpenPanel()
 		panel.message = message
-		panel.prompt = "Grant Access"
+		panel.prompt = "Grant Folder Access"
 		panel.directoryURL = folderURL
 		panel.canChooseFiles = false
 		panel.canChooseDirectories = true

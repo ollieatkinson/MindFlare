@@ -194,6 +194,26 @@ final class LibraryTests: Hopes {
 		XCTAssertEqual(descendantConnections.map(\.path), ["organization.engineering"])
 	}
 
+	func testImportAccessRequestNamesMissingFileAndGrantFolder() {
+		let request = SecurityScopedImportAccess.Request(
+			fileURL: URL(fileURLWithPath: "/Users/example/Lexicons/shared-commerce.lexicon"),
+			importReference: "./shared-commerce.lexicon",
+			underlyingDescription: "The file could not be opened because you do not have permission to view it."
+		)
+
+		XCTAssertEqual(request.fileName, "shared-commerce.lexicon")
+		XCTAssertEqual(request.folderPath, "/Users/example/Lexicons")
+		XCTAssertEqual(request.permissionTitle, "Permission needed for shared-commerce.lexicon")
+		XCTAssertEqual(
+			request.permissionDetail,
+			"Choose /Users/example/Lexicons, or a parent folder that contains all related Lexicon files."
+		)
+		XCTAssertEqual(
+			request.errorDescription,
+			"MindFlare needs permission to read imported Lexicon file \"shared-commerce.lexicon\"."
+		)
+	}
+
 	func testHistoryBackwardsKeepsForwardStack() async throws {
 		let root = await Self.historyRoot()
 		let current = try await root.lexicon["root.b"].try()
