@@ -184,14 +184,14 @@ extension RelationshipList {
 
 		var body: some View {
 			HStack(spacing: 8) {
-				Image(systemName: "link")
+				Image(systemName: "point.3.connected.trianglepath.dotted")
 					.foregroundColor(Color(nsColor: .secondaryLabelColor))
 
 				VStack(alignment: .leading, spacing: 1) {
-					Text(connection.lexicon)
+					Text(inheritanceDescription)
 						.lineLimit(1)
 
-					Text(pathDescription)
+					Text(connection.lexicon)
 						.font(.caption2)
 						.foregroundColor(Color(nsColor: .secondaryLabelColor))
 						.lineLimit(1)
@@ -210,7 +210,7 @@ extension RelationshipList {
 			.help("\(connection.import.reference) at \(connection.path)")
 		}
 
-		private var pathDescription: String {
+		private var inheritanceDescription: String {
 			guard
 				selectedPath != connection.path,
 				selectedPath.hasPrefix(connection.path + ".")
@@ -244,15 +244,15 @@ extension PropertiesView {
 #Preview("Connected nodes") {
 	VStack(alignment: .leading, spacing: 1) {
 		RelationshipList.ConnectionCell(
-			connection: .init(path: "organization.engineering", import: .init("./Imports/engineering.lexicon")),
-			selectedPath: "organization.engineering"
+			connection: .init(path: "commerce", import: .init("./shared-commerce.lexicon")),
+			selectedPath: "commerce.api.storefront.order"
 		)
 		RelationshipList.ConnectionCell(
-			connection: .init(path: "organization.products", import: .init("../Shared/products.lexicon")),
-			selectedPath: "organization.products.roadmap"
+			connection: .init(path: "commerce.api.storefront", import: .init("./storefront-api.lexicon")),
+			selectedPath: "commerce.api.storefront.order"
 		)
 	}
-	.frame(width: 420)
+	.frame(width: 620)
 	.padding()
 }
 
