@@ -195,13 +195,21 @@ struct FractalFlareTuning: Hashable, Sendable {
 	var glow: CGFloat = 1
 
 	static let `default` = Self()
+	static let foldedSilk = Self(
+		intensity: 1.15,
+		turbulence: 1.05,
+		structure: 1,
+		speed: 1.15,
+		hue: 0,
+		glow: 1.1
+	)
 }
 
 struct FractalFlareView: View {
 
 	let graph: Lexicon.Graph
-	var design: FractalFlareDesign? = nil
-	var tuning = FractalFlareTuning.default
+	var design: FractalFlareDesign? = .foldedSilk
+	var tuning = FractalFlareTuning.foldedSilk
 
 	@State private var profile: Profile?
 
@@ -715,14 +723,7 @@ private struct FractalFlareDesignGalleryView: View {
 
 	let graph: Lexicon.Graph
 
-	@State private var tuning = FractalFlareTuning(
-		intensity: 1.15,
-		turbulence: 1.05,
-		structure: 1,
-		speed: 1.15,
-		hue: 0,
-		glow: 1.1
-	)
+	@State private var tuning = FractalFlareTuning.foldedSilk
 
 	private let columns = Array(
 		repeating: GridItem(.fixed(164), spacing: 18, alignment: .top),
