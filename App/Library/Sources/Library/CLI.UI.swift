@@ -139,6 +139,11 @@ extension CLI {
 		let breadcrumbs = breadcrumbs
 		let root = breadcrumbs[0]
 		let breadcrumbIDs = Set(breadcrumbs.map(\.id))
+		let selectedChildIDByParentID = Dictionary(
+			uniqueKeysWithValues: zip(breadcrumbs, breadcrumbs.dropFirst()).map { parent, child in
+				(parent.id, child.id)
+			}
+		)
 		let suggestionIDs = input.isEmpty ? nil : Set(suggestions.map(\.id))
 		var displayIDByTypeID = [Lemma.ID: String]()
 
@@ -173,24 +178,22 @@ extension CLI {
 
 			var selectedRow: Lemma.ID?
 
-			let sections: [UI.Column.Section] = lemma.childrenGroupedByTypeAndSorted
+			let sections: [UI.Column.Section] = LemmaPresentationCache.groupedChildren(of: lemma)
 
-				.map { (type, children) -> (type: Lemma, children: [Lemma]) in
+				.map { group -> LemmaPresentationCache.GroupedChildren in
 					guard let suggestionIDs, lemma == breadcrumbs.last else {
-						return (type, children)
+						return group
 					}
-					return (
-						type: type,
-						children: children.filter { suggestionIDs.contains($0.id) }
+					return LemmaPresentationCache.GroupedChildren(
+						type: group.type,
+						children: group.children.filter { suggestionIDs.contains($0.id) }
 					)
 				}
 
 				.filter(\.children.isEmpty.not)
 				.enumerated()
 				.map { i, group in
-					let selectedIndex = group.children.firstIndex { child in
-						breadcrumbIDs.contains(child.id)
-					}
+					let selectedIndex = selectedChildIDByParentID[lemma.id].flatMap(group.index(of:))
 					let children = group.children.visibleColumnChildren(around: selectedIndex)
 					let displayID = displayIDByTypeID[group.type.id] ?? {
 						let displayID = group.type.lineage.reversed().map(\.displayName).joined(separator: " ")

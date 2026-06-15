@@ -291,6 +291,16 @@ final class LibraryTests: Hopes {
 		XCTAssertEqual(previous.lemma.id, "root.n_0499")
 	}
 
+	func testEmptyInputSiblingSelectionSkipsDuplicateInheritedRows() async throws {
+		let root = await Self.typedSiblingRoot()
+		let current = try await root.lexicon["root.item.shared"].try()
+		let cli = await CLI(current)
+
+		let next = await cli.selectingSibling(offset: 1)
+
+		XCTAssertEqual(next.lemma.id, "root.item.zed")
+	}
+
 	func testColumnsWindowLargeSiblingListsAroundSelection() async throws {
 		let root = await Self.largeSiblingRoot(count: 1_500)
 		let current = try await root.lexicon["root.n_0500"].try()
@@ -351,6 +361,33 @@ final class LibraryTests: Hopes {
 							]
 						),
 						"c": Lexicon.Graph.Node(name: "c"),
+					]
+				)
+			)
+		)
+		.root
+	}
+
+	@LexiconActor private static func typedSiblingRoot() -> Lemma {
+		Lexicon.from(
+			Lexicon.Graph(
+				root: Lexicon.Graph.Node(
+					name: "root",
+					children: [
+						"item": Lexicon.Graph.Node(
+							name: "item",
+							children: [
+								"shared": Lexicon.Graph.Node(name: "shared"),
+							],
+							type: ["root.type"]
+						),
+						"type": Lexicon.Graph.Node(
+							name: "type",
+							children: [
+								"shared": Lexicon.Graph.Node(name: "shared"),
+								"zed": Lexicon.Graph.Node(name: "zed"),
+							]
+						),
 					]
 				)
 			)

@@ -61,6 +61,7 @@ final class Document: Identifiable, ObservableObject, ReferenceFileDocument, Cus
 		var composed: Lexicon.Document
 		var graph: Lexicon.Graph
 		var compositionDiagnostics: [String]
+		private let cachedConnections: [Connection]
 
 		init(
 			old: Lemma.ID? = nil,
@@ -76,6 +77,7 @@ final class Document: Identifiable, ObservableObject, ReferenceFileDocument, Cus
 			self.composed = composed
 			self.graph = graph
 			self.compositionDiagnostics = compositionDiagnostics
+			self.cachedConnections = Self.connections(in: document)
 		}
 
 		init(old: Lemma.ID? = nil, new: Lemma.ID? = nil, graph: Lexicon.Graph) {
@@ -195,12 +197,12 @@ final class Document: Identifiable, ObservableObject, ReferenceFileDocument, Cus
 		}
 
 		func connections(covering id: Lemma.ID) -> [Connection] {
-			connections.filter { connection in
+			cachedConnections.filter { connection in
 				id == connection.path || id.hasPrefix(connection.path + ".")
 			}
 		}
 
-		private var connections: [Connection] {
+		private static func connections(in document: Lexicon.Document) -> [Connection] {
 			var connections = [Connection]()
 
 			if let rootName = document.roots.keys.first {

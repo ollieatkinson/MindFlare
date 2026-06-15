@@ -25,7 +25,8 @@ import SwiftUI
 	@Published var isSearching = false
 
 	var query: String = "" { didSet { stream.send(query) }}
-	var store: [String: [Lexicon.Search.Result]] = [:]
+	private var store: [SearchResultCacheKey: [Lexicon.Search.Result]] = [:]
+	private var cachedIndex: SearchIndexCache?
 
 	private var task: Task<Void, Never>?
 
@@ -69,13 +70,6 @@ import SwiftUI
 
 		let cacheKey = query.localizedLowercase
 
-		if let stored = store[cacheKey] {
-			results = stored
-			suggestions = stored.map(\.id)
-			isSearching = false
-			return
-		}
-
 		isSearching = true
 
 		task = Task { [weak self] in
@@ -85,9 +79,24 @@ import SwiftUI
 			}
 
 			let document = await self.lexicon.document
-			let results = await Self.results(for: query, in: document)
+			let signature = SearchDocumentSignature(document: document)
+			let resultCacheKey = SearchResultCacheKey(
+				signature: signature,
+				query: cacheKey,
+				limit: Self.defaultResultLimit
+			)
+			let results: [Lexicon.Search.Result]
+			if let stored = store[resultCacheKey] {
+				results = stored
+			} else {
+				results = await self.results(
+					for: query,
+					in: document,
+					signature: signature,
+					cacheKey: resultCacheKey
+				)
+			}
 
-			store[cacheKey] = results
 			guard !Task.isCancelled else {
 				return
 			}
@@ -103,24 +112,114 @@ import SwiftUI
 	nonisolated static func results(
 		for query: String,
 		in document: Lexicon.Document,
-		limit: Int = 1_000
+		limit: Int = defaultResultLimit
 	) async -> [Lexicon.Search.Result] {
+		do {
+			let index = try await materializedIndex(for: document, limit: limit)
+			return await search(query, in: index)
+		} catch {
+			return await fallbackResults(for: query, in: document, limit: limit)
+		}
+	}
+
+	nonisolated private static let defaultResultLimit = 1_000
+
+	private func results(
+		for query: String,
+		in document: Lexicon.Document,
+		signature: SearchDocumentSignature,
+		cacheKey: SearchResultCacheKey
+	) async -> [Lexicon.Search.Result] {
+		do {
+			let cache = try await index(for: document, signature: signature, limit: cacheKey.limit)
+			let results = await Self.search(query, in: cache.index)
+			store[cacheKey] = results
+			return results
+		} catch {
+			let results = await Self.fallbackResults(for: query, in: document, limit: cacheKey.limit)
+			store[cacheKey] = results
+			return results
+		}
+	}
+
+	private func index(
+		for document: Lexicon.Document,
+		signature: SearchDocumentSignature,
+		limit: Int
+	) async throws -> SearchIndexCache {
+		if let cachedIndex, cachedIndex.signature == signature, cachedIndex.limit == limit {
+			return cachedIndex
+		}
+
+		let index = try await Self.materializedIndex(for: document, limit: limit)
+		let cache = SearchIndexCache(signature: signature, limit: limit, index: index)
+		cachedIndex = cache
+		store = store.filter { $0.key.signature == signature }
+		return cache
+	}
+
+	nonisolated private static func materializedIndex(
+		for document: Lexicon.Document,
+		limit: Int
+	) async throws -> Lexicon.Search.Index {
 		let options = Lexicon.Search.Options(
 			limit: limit,
 			mode: .hybrid,
 			scope: .full
 		)
-		let index = Lexicon.Search.Index(document: document, options: options)
+		return try await Task.detached(priority: .userInitiated) {
+			let index = Lexicon.Search.Index(document: document, options: options)
+			return try await index.materialized(in: document)
+		}.value
+	}
 
-		do {
-			return try await index.search(query, in: document)
-		} catch {
-			let fallback = Lexicon.Search.Options(
-				limit: limit,
-				mode: [.lexical, .token],
-				scope: .own
-			)
+	nonisolated private static func search(
+		_ query: String,
+		in index: Lexicon.Search.Index
+	) async -> [Lexicon.Search.Result] {
+		await Task.detached(priority: .userInitiated) {
+			index.search(query)
+		}.value
+	}
+
+	nonisolated private static func fallbackResults(
+		for query: String,
+		in document: Lexicon.Document,
+		limit: Int
+	) async -> [Lexicon.Search.Result] {
+		let fallback = Lexicon.Search.Options(
+			limit: limit,
+			mode: [.lexical, .token],
+			scope: .own
+		)
+		return await Task.detached(priority: .userInitiated) {
 			return document.search(query, options: fallback)
+		}.value
+	}
+}
+
+private struct SearchIndexCache {
+	let signature: SearchDocumentSignature
+	let limit: Int
+	let index: Lexicon.Search.Index
+}
+
+private struct SearchResultCacheKey: Hashable {
+	let signature: SearchDocumentSignature
+	let query: String
+	let limit: Int
+}
+
+private struct SearchDocumentSignature: Hashable, Sendable {
+	let date: Date
+	let rootNames: [String]
+	let imports: [String]
+
+	init(document: Lexicon.Document) {
+		self.date = document.date
+		self.rootNames = Array(document.roots.keys)
+		self.imports = document.imports.map {
+			"\($0.location.rawValue):\($0.reference)"
 		}
 	}
 }

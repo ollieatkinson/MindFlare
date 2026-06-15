@@ -10,12 +10,12 @@ extension CLI {
 			guard let parent = lemma.parent else {
 				continue
 			}
-			let siblings = parent.childrenSortedByType
-			guard siblings.count > 1, let index = siblings.firstIndex(of: lemma) else {
+			let siblings = LemmaPresentationCache.sortedChildren(of: parent)
+			guard siblings.children.count > 1, let index = siblings.index(of: lemma) else {
 				continue
 			}
-			let nextIndex = (index + offset).wrapped(inside: siblings.count)
-			return reseting(to: siblings[nextIndex], root: root)
+			let nextIndex = (index + offset).wrapped(inside: siblings.children.count)
+			return reseting(to: siblings.children[nextIndex], root: root)
 		}
 		return self
 	}
