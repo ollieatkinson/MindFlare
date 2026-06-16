@@ -256,6 +256,81 @@ final class LibraryTests: Hopes {
 		XCTAssertEqual(checkoutUI.properties.defaultValue, .literal(.object(["enabled": .bool(true)])))
 	}
 
+	func testMetadataEditingUpdatesNodeAndDocumentMetadata() async throws {
+		let document = try TaskPaper("""
+			# Old file comment.
+			> Old file note.
+			commerce:
+				checkout:
+				? false
+					# Old implementation comment.
+					> Old product note.
+			""").decodeDocument()
+		let lexicon = try await Lexicon.from(document)
+		var checkout = try await lexicon["commerce.checkout"].try()
+
+		checkout = try await applyMetadataEdit(
+			.note(index: 0),
+			value: "Checkout notes explain product vocabulary.",
+			to: checkout
+		).try()
+		checkout = try await applyMetadataEdit(
+			.comment(index: nil),
+			value: "Useful for implementation and review context.",
+			to: checkout
+		).try()
+		checkout = try await applyMetadataEdit(
+			.defaultValue,
+			value: #"{"enabled":true}"#,
+			to: checkout
+		).try()
+
+		let node = await checkout.node
+		XCTAssertEqual(node.notes, ["Checkout notes explain product vocabulary."])
+		XCTAssertEqual(
+			node.comments,
+			[
+				"Old implementation comment.",
+				"Useful for implementation and review context.",
+			]
+		)
+		XCTAssertEqual(node.defaultValue, .literal(.object(["enabled": .bool(true)])))
+
+		checkout = try await applyMetadataEdit(
+			.comment(index: 0),
+			value: "",
+			to: checkout
+		).try()
+
+		let editedNode = await checkout.node
+		XCTAssertEqual(editedNode.comments, ["Useful for implementation and review context."])
+
+		var root = await lexicon.root
+		root = try await applyMetadataEdit(
+			.documentNote(index: 0),
+			value: "The commerce lexicon describes checkout language.",
+			to: root
+		).try()
+		root = try await applyMetadataEdit(
+			.documentComment(index: nil),
+			value: "Document comments hold file-level maintenance context.",
+			to: root
+		).try()
+
+		let editedDocument = await root.lexicon.document
+		XCTAssertEqual(
+			editedDocument.notes,
+			["The commerce lexicon describes checkout language."]
+		)
+		XCTAssertEqual(
+			editedDocument.comments,
+			[
+				"Old file comment.",
+				"Document comments hold file-level maintenance context.",
+			]
+		)
+	}
+
 	func testImportAccessRequestNamesMissingFileAndGrantFolder() {
 		let request = SecurityScopedImportAccess.Request(
 			fileURL: URL(fileURLWithPath: "/Users/example/Lexicons/shared-commerce.lexicon"),
