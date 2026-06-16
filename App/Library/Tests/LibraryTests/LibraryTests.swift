@@ -243,20 +243,15 @@ final class LibraryTests: Hopes {
 					> Product note.
 			""").decodeDocument()
 		let lexicon = try await Lexicon.from(document)
-		let rootUI = await CLI(lexicon.root).ui(context: .viewing)
 		let checkout = try await lexicon["commerce.checkout"].try()
 		let checkoutUI = await CLI(checkout).ui(context: .viewing)
 
-		XCTAssertEqual(rootUI.properties.documentNotes, ["File note."])
-		XCTAssertEqual(rootUI.properties.documentComments, ["File comment."])
-		XCTAssertEqual(checkoutUI.properties.documentNotes, [])
-		XCTAssertEqual(checkoutUI.properties.documentComments, [])
 		XCTAssertEqual(checkoutUI.properties.notes, ["Product note."])
 		XCTAssertEqual(checkoutUI.properties.comments, ["Implementation comment."])
 		XCTAssertEqual(checkoutUI.properties.defaultValue, .literal(.object(["enabled": .bool(true)])))
 	}
 
-	func testMetadataEditingUpdatesNodeAndDocumentMetadata() async throws {
+	func testMetadataEditingUpdatesNodeMetadata() async throws {
 		let document = try TaskPaper("""
 			# Old file comment.
 			> Old file note.
@@ -304,31 +299,6 @@ final class LibraryTests: Hopes {
 
 		let editedNode = await checkout.node
 		XCTAssertEqual(editedNode.comments, ["Useful for implementation and review context."])
-
-		var root = await lexicon.root
-		root = try await applyMetadataEdit(
-			.documentNote(index: 0),
-			value: "The commerce lexicon describes checkout language.",
-			to: root
-		).try()
-		root = try await applyMetadataEdit(
-			.documentComment(index: nil),
-			value: "Document comments hold file-level maintenance context.",
-			to: root
-		).try()
-
-		let editedDocument = await root.lexicon.document
-		XCTAssertEqual(
-			editedDocument.notes,
-			["The commerce lexicon describes checkout language."]
-		)
-		XCTAssertEqual(
-			editedDocument.comments,
-			[
-				"Old file comment.",
-				"Document comments hold file-level maintenance context.",
-			]
-		)
 	}
 
 	func testImportAccessRequestNamesMissingFileAndGrantFolder() {

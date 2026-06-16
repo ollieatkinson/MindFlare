@@ -16,7 +16,7 @@ extension View {
 struct Searchable<A: L & I_app_ui_search>: ViewModifier {
 
 	@Environment(\.events) var events
-	@Environment(\.isSearching) var isSearching
+	@Environment(\.windowNumber) var windowNumber
 
 	@State var query = ""
 	@State var submitted = ""
@@ -69,6 +69,17 @@ struct Searchable<A: L & I_app_ui_search>: ViewModifier {
 			.on(search.did.start) { _ in
 				isSearchFocused = true
 			}
+			.onReceive(NSWindow.keyDown) { event in
+				guard
+					isSearchFocused,
+					event.windowNumber == windowNumber,
+					event.keyCode == .escKey
+				else {
+					return
+				}
+				isSearchFocused = false
+				event.window?.makeFirstResponder(nil)
+			}
 			.modifier(Child(search: search))
 	}
 
@@ -94,6 +105,10 @@ struct Searchable<A: L & I_app_ui_search>: ViewModifier {
 			}
 		}
 	}
+}
+
+private extension UInt16 {
+	static let escKey: UInt16 = 53
 }
 
 struct LexiconSearchResultsView: View {

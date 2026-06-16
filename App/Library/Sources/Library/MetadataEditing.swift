@@ -9,8 +9,6 @@ enum MetadataEditTarget: Equatable, Sendable {
 	case defaultValue
 	case note(index: Int?)
 	case comment(index: Int?)
-	case documentNote(index: Int?)
-	case documentComment(index: Int?)
 }
 
 extension Editor.Object {
@@ -56,14 +54,6 @@ func applyMetadataEdit(
 			var comments = lemma.node.comments
 			comments.updateMetadataValue(at: index, with: value)
 			return lemma.settingComments(comments)
-		case .documentNote(let index):
-			var notes = lemma.lexicon.document.notes
-			notes.updateMetadataValue(at: index, with: value)
-			return lemma.settingDocumentNotes(notes)
-		case .documentComment(let index):
-			var comments = lemma.lexicon.document.comments
-			comments.updateMetadataValue(at: index, with: value)
-			return lemma.settingDocumentComments(comments)
 	}
 }
 
@@ -73,8 +63,6 @@ private extension MetadataEditTarget {
 		switch self {
 			case .defaultValue, .note, .comment:
 				return "This metadata belongs to an inherited lemma. Open the source Lexicon to edit it."
-			case .documentNote, .documentComment:
-				return "File-level notes and comments can only be edited from the root lemma of the Lexicon."
 		}
 	}
 }
@@ -99,18 +87,6 @@ private extension Lemma {
 		}
 	}
 
-	func settingDocumentNotes(_ notes: [String]) -> Lemma? {
-		updatingDocument { document in
-			document.notes = notes
-		}
-	}
-
-	func settingDocumentComments(_ comments: [String]) -> Lemma? {
-		updatingDocument { document in
-			document.comments = comments
-		}
-	}
-
 	func updatingGraphNode(_ update: (inout Lexicon.Graph.Node) -> Void) -> Lemma? {
 		guard
 			isGraphNode,
@@ -122,19 +98,6 @@ private extension Lemma {
 		graph.date = .init()
 		update(&graph[graphPath])
 		lexicon.reset(to: graph)
-		return lexicon[id] ?? lexicon.root
-	}
-
-	func updatingDocument(_ update: (inout Lexicon.Document) -> Void) -> Lemma? {
-		guard parent == nil else {
-			return nil
-		}
-		var document = lexicon.document
-		document.date = .init()
-		update(&document)
-		guard (try? lexicon.reset(to: document, root: lexicon.graph.root.name)) != nil else {
-			return nil
-		}
 		return lexicon[id] ?? lexicon.root
 	}
 }

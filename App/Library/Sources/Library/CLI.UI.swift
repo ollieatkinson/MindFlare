@@ -97,8 +97,6 @@ extension CLI.UI {
 		var isSynonym: Bool?
 		var protonym: Lemma?
 		var defaultValue: Lexicon.Graph.Node.DefaultValue?
-		var documentNotes: [String]
-		var documentComments: [String]
 		var notes: [String]
 		var comments: [String]
 	}
@@ -257,8 +255,6 @@ extension CLI {
 			isSynonym: lemma.protonym != nil,
 			protonym: lemma.protonym?.unwrapped,
 			defaultValue: lemma.defaultValue,
-			documentNotes: lemma.parent == nil ? lemma.lexicon.document.notes : [],
-			documentComments: lemma.parent == nil ? lemma.lexicon.document.comments : [],
 			notes: lemma.node.notes,
 			comments: lemma.node.comments
 		)

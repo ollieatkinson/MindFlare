@@ -116,34 +116,6 @@ struct RelationshipList: View {
 				)
 			}
 
-			ForEach(Array(ui.documentNotes.enumerated()), id: \.offset) { index, note in
-				MetadataCell(
-					kind: .documentNote,
-					value: note,
-					edit: canEditDocumentMetadata ? {
-						editMetadata(
-							.documentNote,
-							target: .documentNote(index: index),
-							initialValue: note
-						)
-					} : nil
-				)
-			}
-
-			ForEach(Array(ui.documentComments.enumerated()), id: \.offset) { index, comment in
-				MetadataCell(
-					kind: .documentComment,
-					value: comment,
-					edit: canEditDocumentMetadata ? {
-						editMetadata(
-							.documentComment,
-							target: .documentComment(index: index),
-							initialValue: comment
-						)
-					} : nil
-				)
-			}
-
 			ForEach(Array(ui.notes.enumerated()), id: \.offset) { index, note in
 				MetadataCell(
 					kind: .note,
@@ -175,7 +147,6 @@ struct RelationshipList: View {
 			if canAddMetadata {
 				MetadataActionsCell(
 					canAddDefault: canEditNodeMetadata && ui.defaultValue == nil,
-					canAddDocumentMetadata: canEditDocumentMetadata,
 					add: editNewMetadata
 				)
 			}
@@ -213,8 +184,6 @@ struct RelationshipList: View {
 	private var isEmpty: Bool {
 		ui.protonym == nil &&
 		ui.defaultValue == nil &&
-		ui.documentNotes.isEmpty &&
-		ui.documentComments.isEmpty &&
 		ui.notes.isEmpty &&
 		ui.comments.isEmpty &&
 		ui.type.isEmpty &&
@@ -225,12 +194,8 @@ struct RelationshipList: View {
 		ui.cli.lemma.isGraphNode
 	}
 
-	private var canEditDocumentMetadata: Bool {
-		ui.cli.lemma.parent == nil
-	}
-
 	private var canAddMetadata: Bool {
-		canEditNodeMetadata || canEditDocumentMetadata
+		canEditNodeMetadata
 	}
 
 	private func editMetadata(
@@ -251,10 +216,6 @@ struct RelationshipList: View {
 		switch kind {
 			case .defaultValue:
 				target = .defaultValue
-			case .documentNote:
-				target = .documentNote(index: nil)
-			case .documentComment:
-				target = .documentComment(index: nil)
 			case .note:
 				target = .note(index: nil)
 			case .comment:
@@ -273,8 +234,6 @@ extension RelationshipList {
 
 	enum MetadataKind {
 		case defaultValue
-		case documentNote
-		case documentComment
 		case note
 		case comment
 
@@ -282,10 +241,6 @@ extension RelationshipList {
 			switch self {
 				case .defaultValue:
 					return "Default"
-				case .documentNote:
-					return "Doc Note"
-				case .documentComment:
-					return "Doc Comment"
 				case .note:
 					return "Note"
 				case .comment:
@@ -297,10 +252,6 @@ extension RelationshipList {
 			switch self {
 				case .defaultValue:
 					return "Default Value"
-				case .documentNote:
-					return "Document Note"
-				case .documentComment:
-					return "Document Comment"
 				case .note:
 					return "Note"
 				case .comment:
@@ -312,10 +263,6 @@ extension RelationshipList {
 			switch self {
 				case .defaultValue:
 					return "equal.circle"
-				case .documentNote:
-					return "doc.text"
-				case .documentComment:
-					return "doc.text.below.ecg"
 				case .note:
 					return "note.text"
 				case .comment:
@@ -327,10 +274,6 @@ extension RelationshipList {
 			switch self {
 				case .defaultValue:
 					return #"true, "label", {"key":"value"}, or @ lexicon.path"#
-				case .documentNote:
-					return "What is this lexicon useful for?"
-				case .documentComment:
-					return "What should maintainers know about this file?"
 				case .note:
 					return "What does this term mean or help with?"
 				case .comment:
@@ -342,10 +285,6 @@ extension RelationshipList {
 			switch self {
 				case .defaultValue:
 					return "Defaults give this term a canonical value for tools and generated output. Use JSON for literal values, or @ path to point at another lemma."
-				case .documentNote:
-					return "Document notes describe what the whole lexicon is useful for. They are searchable and travel with the file."
-				case .documentComment:
-					return "Document comments are for file-level working context: review notes, implementation detail, or migration reminders."
 				case .note:
 					return "Notes are for meaning, examples, and why this term exists. They help search explain why a result is relevant."
 				case .comment:
@@ -415,7 +354,6 @@ extension RelationshipList {
 	struct MetadataActionsCell: View {
 
 		let canAddDefault: Bool
-		let canAddDocumentMetadata: Bool
 		let add: (MetadataKind) -> Void
 
 		var body: some View {
@@ -425,12 +363,6 @@ extension RelationshipList {
 				}
 				actionButton(.note)
 				actionButton(.comment)
-				if canAddDocumentMetadata {
-					Divider()
-						.frame(height: 14)
-					actionButton(.documentNote)
-					actionButton(.documentComment)
-				}
 				Spacer(minLength: 0)
 			}
 			.propertyListRow()
@@ -780,12 +712,6 @@ extension PropertiesView {
 			"enabled": .bool(true),
 			"mode": .string("hybrid"),
 		]))
-		properties.documentNotes = [
-			"This file describes the application vocabulary.",
-		]
-		properties.documentComments = [
-			"Document comments remain visible when the root is selected.",
-		]
 		properties.notes = [
 			"Search metadata is surfaced in the editor so the reason for a match stays visible.",
 			"Notes can capture product vocabulary and domain reminders.",
