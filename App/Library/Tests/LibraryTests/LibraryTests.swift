@@ -232,6 +232,30 @@ final class LibraryTests: Hopes {
 		XCTAssert(checkout.matches.contains { $0.field == .contextChild })
 	}
 
+	func testPropertiesSurfaceLexiconMetadata() async throws {
+		let document = try TaskPaper("""
+			# File comment.
+			> File note.
+			commerce:
+				checkout:
+				? {"enabled":true}
+					# Implementation comment.
+					> Product note.
+			""").decodeDocument()
+		let lexicon = try await Lexicon.from(document)
+		let rootUI = await CLI(lexicon.root).ui(context: .viewing)
+		let checkout = try await lexicon["commerce.checkout"].try()
+		let checkoutUI = await CLI(checkout).ui(context: .viewing)
+
+		XCTAssertEqual(rootUI.properties.documentNotes, ["File note."])
+		XCTAssertEqual(rootUI.properties.documentComments, ["File comment."])
+		XCTAssertEqual(checkoutUI.properties.documentNotes, [])
+		XCTAssertEqual(checkoutUI.properties.documentComments, [])
+		XCTAssertEqual(checkoutUI.properties.notes, ["Product note."])
+		XCTAssertEqual(checkoutUI.properties.comments, ["Implementation comment."])
+		XCTAssertEqual(checkoutUI.properties.defaultValue, .literal(.object(["enabled": .bool(true)])))
+	}
+
 	func testImportAccessRequestNamesMissingFileAndGrantFolder() {
 		let request = SecurityScopedImportAccess.Request(
 			fileURL: URL(fileURLWithPath: "/Users/example/Lexicons/shared-commerce.lexicon"),
