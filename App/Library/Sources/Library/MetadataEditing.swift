@@ -25,7 +25,7 @@ extension Editor.Object {
 				return
 			}
 			Task { @MainActor in
-				self?.uiContext = .viewing
+				self?.isEditingMetadata = false
 				self?.nextLemma = lemma
 			}
 		}

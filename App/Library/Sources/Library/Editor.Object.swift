@@ -33,6 +33,11 @@ extension Editor {
 		var document: Document
 		let fileURL: URL?
 		var focusedDocumentID: UInt?
+		var isEditingMetadata = false
+
+		var acceptsCLIEvents: Bool {
+			uiContext != .renaming && !isEditingMetadata
+		}
 
 		lazy var then = mainContext { my in my.isFocused && my.isViewing }
 		lazy var inFocus = mainContext { my in my.isFocused }

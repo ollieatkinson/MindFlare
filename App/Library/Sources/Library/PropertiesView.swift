@@ -507,13 +507,11 @@ extension RelationshipList {
 			.padding(14)
 			.frame(width: 380)
 			.onAppear {
-				my.uiContext = .renaming
+				my.isEditingMetadata = true
 				isFocused = true
 			}
 			.onDisappear {
-				if my.uiContext == .renaming {
-					my.uiContext = .viewing
-				}
+				my.isEditingMetadata = false
 			}
 		}
 
